@@ -1,0 +1,424 @@
+from __future__ import annotations
+
+import time
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from app import event_service
+from app import notification_service
+from app import review_service
+from app import scan_workflow
+from app import signal_service
+from app import thsdk_service
+from app import tdx_service
+from app import watchlist_service
+
+app = FastAPI(title="AI Finance TDX API", version="0.1.0")
+
+
+class FlowRankRequest(BaseModel):
+    codes: list[str] = Field(default_factory=list)
+    codes_text: str = ""
+    fields: list[str] = Field(default_factory=lambda: list(tdx_service.DEFAULT_FLOW_FIELDS))
+    inflow_field: str = "Zjl_HB"
+    min_net_inflow: float = 0.0
+    limit: int = Field(default=20, ge=1, le=500)
+    fallback_to_akshare: bool = True
+
+
+class MoreInfoRequest(BaseModel):
+    codes: list[str] = Field(default_factory=list)
+    codes_text: str = ""
+    fields: list[str] = Field(default_factory=lambda: ["HqDate", "Zjl", "Zjl_HB"])
+
+
+class ThsdkKlinesRequest(BaseModel):
+    symbol: str
+    count: int = Field(default=100, ge=1, le=5000)
+
+
+class DailySignalsRequest(BaseModel):
+    codes: list[str] = Field(default_factory=list)
+    codes_text: str = ""
+    lookback_days: int = Field(default=180, ge=30, le=2000)
+    adjust: str = "qfq"
+    max_workers: int = Field(default=8, ge=1, le=32)
+    only_secondary_golden_cross: bool = False
+
+
+class DefaultWatchlistRequest(BaseModel):
+    codes: list[str] = Field(default_factory=list)
+    codes_text: str = ""
+
+
+class ImportIndexWatchlistRequest(BaseModel):
+    index_code: str = "000300"
+
+
+class ScanDefaultSignalsRequest(BaseModel):
+    lookback_days: int = Field(default=180, ge=30, le=2000)
+    adjust: str = "qfq"
+    max_workers: int = Field(default=8, ge=1, le=32)
+
+
+class RunDailyJobRequest(BaseModel):
+    lookback_days: int = Field(default=180, ge=30, le=2000)
+    adjust: str = "qfq"
+    channel: str = "stdout"
+    max_workers: int = Field(default=8, ge=1, le=32)
+
+
+class BackfillReviewsRequest(BaseModel):
+    trade_date: str = ""
+    code: str = ""
+    horizons: list[int] = Field(default_factory=lambda: [1, 3, 5])
+    adjust: str = "qfq"
+
+
+def merge_codes(codes: list[str], codes_text: str) -> list[str]:
+    combined = []
+    combined.extend(codes)
+    combined.extend(tdx_service.parse_codes_text(codes_text))
+    return tdx_service.dedupe_keep_order(tdx_service.normalize_codes(combined))
+
+
+def select_newly_delivered_events(
+    events: list[dict[str, Any]],
+    deliveries: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    created_deliveries = [item for item in deliveries if item.get("created")]
+    if not created_deliveries:
+        return []
+
+    created_ids = {
+        int(item["signal_event_id"])
+        for item in created_deliveries
+        if item.get("signal_event_id") is not None
+    }
+    if created_ids:
+        return [event for event in events if event.get("id") is not None and int(event["id"]) in created_ids]
+    return list(events)
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "provider": "TongDaXin",
+        "as_of": tdx_service.now_ts(),
+    }
+
+
+@app.post("/api/tdx/flow-rank")
+def api_flow_rank(req: FlowRankRequest) -> dict[str, Any]:
+    try:
+        codes = merge_codes(req.codes, req.codes_text)
+        if not codes:
+            raise ValueError("至少提供一个股票代码")
+
+        try:
+            df = tdx_service.flow_rank_tdx(
+                codes=codes,
+                fields=req.fields,
+                inflow_field=req.inflow_field.strip(),
+                min_net_inflow=float(req.min_net_inflow),
+                limit=int(req.limit),
+            )
+            items = tdx_service.dataframe_to_records(df)
+            return {
+                "as_of": tdx_service.now_ts(),
+                "count": len(items),
+                "items": items,
+                "source": "tdx",
+            }
+        except tdx_service.TdxUnavailableError as tdx_exc:
+            if not req.fallback_to_akshare:
+                raise HTTPException(status_code=503, detail=str(tdx_exc)) from tdx_exc
+
+            try:
+                fallback_df = tdx_service.flow_rank_akshare_for_codes(
+                    codes=codes,
+                    min_net_inflow=float(req.min_net_inflow),
+                    limit=int(req.limit),
+                )
+                items = tdx_service.dataframe_to_records(fallback_df)
+                return {
+                    "as_of": tdx_service.now_ts(),
+                    "count": len(items),
+                    "items": items,
+                    "source": "akshare_fallback",
+                    "warning": str(tdx_exc),
+                }
+            except Exception as fallback_exc:  # noqa: BLE001
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"{tdx_exc}；且 AkShare 兜底失败: {fallback_exc}",
+                ) from fallback_exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/tdx/more-info")
+def api_more_info(req: MoreInfoRequest) -> dict[str, Any]:
+    try:
+        codes = merge_codes(req.codes, req.codes_text)
+        if not codes:
+            raise ValueError("至少提供一个股票代码")
+
+        df = tdx_service.more_info_tdx(codes=codes, fields=req.fields)
+        items = tdx_service.dataframe_to_records(df)
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
+    except tdx_service.TdxUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/thsdk/klines")
+def api_thsdk_klines(req: ThsdkKlinesRequest) -> dict[str, Any]:
+    try:
+        symbol = req.symbol.strip()
+        if not symbol:
+            raise ValueError("symbol 不能为空")
+
+        df = thsdk_service.klines_thsdk(symbol=symbol, count=int(req.count))
+        items = tdx_service.dataframe_to_records(df)
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+            "source": "thsdk",
+        }
+    except thsdk_service.ThsdkUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/signals/daily")
+def api_daily_signals(req: DailySignalsRequest) -> dict[str, Any]:
+    try:
+        codes = merge_codes(req.codes, req.codes_text)
+        if not codes:
+            raise ValueError("至少提供一个股票代码")
+
+        started_at = time.perf_counter()
+        df, errors = signal_service.scan_stock_signal_events(
+            codes=codes,
+            lookback_days=int(req.lookback_days),
+            adjust=req.adjust.strip(),
+            max_workers=int(req.max_workers),
+            only_secondary_golden_cross=bool(req.only_secondary_golden_cross),
+        )
+        items = tdx_service.dataframe_to_records(df)
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "requested_count": len(codes),
+            "error_count": len(errors),
+            "elapsed_seconds": round(time.perf_counter() - started_at, 3),
+            "items": items,
+            "errors": errors,
+            "source": "akshare",
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/watchlists/default")
+def api_get_default_watchlist() -> dict[str, Any]:
+    return watchlist_service.get_default_watchlist()
+
+
+@app.post("/api/watchlists/default")
+def api_update_default_watchlist(req: DefaultWatchlistRequest) -> dict[str, Any]:
+    codes = merge_codes(req.codes, req.codes_text)
+    return watchlist_service.replace_default_watchlist_items(codes)
+
+
+@app.post("/api/watchlists/default/import-index")
+def api_import_default_watchlist(req: ImportIndexWatchlistRequest) -> dict[str, Any]:
+    try:
+        return watchlist_service.import_default_watchlist_from_index(
+            index_code=req.index_code.strip(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/signals/scan-default")
+def api_scan_default_signals(req: ScanDefaultSignalsRequest) -> dict[str, Any]:
+    try:
+        watchlist = watchlist_service.get_default_watchlist()
+        codes = [str(item["code"]) for item in watchlist["items"]]
+        if not codes:
+            raise ValueError("默认股票池为空，请先保存股票代码")
+
+        started_at = time.perf_counter()
+        df, errors = signal_service.scan_stock_signal_events(
+            codes=codes,
+            lookback_days=int(req.lookback_days),
+            adjust=req.adjust.strip(),
+            max_workers=int(req.max_workers),
+        )
+        items = event_service.persist_signal_rows(df)
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "requested_count": len(codes),
+            "error_count": len(errors),
+            "elapsed_seconds": round(time.perf_counter() - started_at, 3),
+            "items": items,
+            "errors": errors,
+            "source": "akshare",
+            "watchlist": {
+                "id": watchlist["id"],
+                "name": watchlist["name"],
+                "count": watchlist["count"],
+            },
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/signals/events")
+def api_list_signal_events(
+    trade_date: str | None = None,
+    code: str | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+) -> dict[str, Any]:
+    try:
+        items = event_service.list_signal_events(
+            trade_date=trade_date.strip() if trade_date else None,
+            code=code.strip() if code else None,
+            limit=int(limit),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/signals/run-daily-job")
+def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
+    try:
+        result = scan_workflow.run_default_watchlist_scan(
+            lookback_days=int(req.lookback_days),
+            adjust=req.adjust.strip(),
+            channel=req.channel.strip() or "stdout",
+            max_workers=int(req.max_workers),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(result["persisted_events"]),
+            "requested_count": int(result.get("requested_count", result["watchlist"].get("count", 0))),
+            "error_count": len(result["errors"]),
+            "elapsed_seconds": result.get("elapsed_seconds"),
+            "items": result["persisted_events"],
+            "deliveries": result["delivery_results"],
+            "errors": result["errors"],
+            "source": "akshare",
+            "watchlist": {
+                "id": result["watchlist"].get("id"),
+                "name": result["watchlist"].get("name", ""),
+                "count": result["watchlist"].get("count", 0),
+            },
+            "messages": notification_service.build_stdout_messages(
+                select_newly_delivered_events(
+                    result["persisted_events"],
+                    result["delivery_results"],
+                )
+            ),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/reviews/backfill")
+def api_backfill_reviews(req: BackfillReviewsRequest) -> dict[str, Any]:
+    try:
+        result = review_service.backfill_review_snapshots(
+            trade_date=req.trade_date.strip() or None,
+            code=req.code.strip() or None,
+            horizons=req.horizons,
+            adjust=req.adjust.strip(),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": result["count"],
+            "items": result["items"],
+            "errors": result["errors"],
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/reviews/stats")
+def api_review_stats(
+    horizon: str = Query(default="T+3"),
+    trade_date: str | None = None,
+    code: str | None = None,
+) -> dict[str, Any]:
+    try:
+        items = review_service.summarize_review_stats(
+            horizon=horizon.strip() or "T+3",
+            trade_date=trade_date.strip() if trade_date else None,
+            code=code.strip() if code else None,
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/reviews/snapshots")
+def api_review_snapshots(
+    trade_date: str | None = None,
+    code: str | None = None,
+    horizon: str | None = None,
+    limit: int = Query(default=200, ge=1, le=1000),
+) -> dict[str, Any]:
+    try:
+        items = review_service.list_review_snapshots(
+            trade_date=trade_date.strip() if trade_date else None,
+            code=code.strip() if code else None,
+            horizon=horizon.strip() if horizon else None,
+            limit=int(limit),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc

@@ -1,0 +1,8 @@
+akshare>=1.17.0
+pandas>=2.2.0
+fastapi>=0.116.0
+uvicorn>=0.35.0
+streamlit>=1.48.0
+requests>=2.32.0
+pytest>=8.4.0
+httpx>=0.28.0

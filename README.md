@@ -1,0 +1,368 @@
+# AI Finance
+
+一个面向 A 股的股票扫描与复盘平台。当前仓库的目标不是“演示页面”，而是一个可运行、可筛选、可沉淀事件、可部署的系统。
+
+## 目标
+
+这个平台需要满足 3 个基本要求：
+
+1. 真正可用
+   能批量扫描、输出清晰结果、记录错误、沉淀事件、支持日常复盘。
+2. 能筛选特定形态
+   当前已支持批量筛选 `水下金叉后水上再次金叉` 的股票。
+3. 能部署
+   当前仓库提供 `Dockerfile` 和 `docker-compose.yml`，可以把 API、页面、定时任务作为三个服务部署。
+
+## 当前能力
+
+- 资金流查询
+  - 通达信 `TdxQuant` 主力净流入
+  - `AkShare` 兜底
+- 日线信号扫描
+  - `MACD金叉`
+  - `MACD死叉`
+  - `MA5上穿MA20`
+  - `MA5下穿MA20`
+  - `水下金叉后水上再次金叉`
+- 默认股票池
+  - 支持手工维护
+  - 支持一键导入 `沪深300` 成分股
+- 事件沉淀
+  - 扫描结果写入 `signal_events`
+  - 通知结果写入 `notification_deliveries`
+  - 复盘结果写入 `review_snapshots`
+- 页面与接口
+  - FastAPI API
+  - Streamlit 页面
+  - CLI 命令
+- 通知与调度
+  - `stdout` 通知
+  - 飞书机器人 webhook 通知
+  - 独立 worker 每天定时执行默认股票池扫描
+
+## 新增形态定义
+
+`水下金叉后水上再次金叉` 当前按下面规则识别：
+
+1. 最新一个交易日刚刚出现 `MACD金叉`
+2. 最新这一笔金叉发生时，`DIF > 0` 且 `DEA > 0`
+3. 在更早的历史中，出现过至少一次 `DIF < 0` 且 `DEA < 0` 的 `MACD金叉`
+
+这类信号会在扫描结果里出现在 `MACD形态` 字段中，值为：
+
+- `水下金叉后水上再次金叉`
+
+## 项目结构
+
+```text
+app/
+  api.py                  FastAPI 接口
+  ui.py                   Streamlit 页面
+  signal_service.py       日线信号计算与批量扫描
+  event_service.py        信号事件入库
+  watchlist_service.py    默认股票池
+  notification_service.py 通知发送与去重
+  worker_service.py       定时任务调度
+  review_service.py       复盘回填与统计
+  db.py                   SQLite 初始化
+scripts/
+  get_stock_data.py       CLI 查询入口
+  run_daily_scan.py       每日扫描任务
+  run_scan_worker.py      常驻任务进程
+  review_signal_outcomes.py 复盘任务
+data/
+  app.db                  默认 SQLite 数据库
+```
+
+## 环境要求
+
+- Python 3.11+
+- macOS / Linux
+- 如需 Docker 部署：Docker + Docker Compose v2
+
+## 本地启动
+
+### 1. 安装依赖
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2. 启动 API
+
+```bash
+uvicorn app.api:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 3. 启动页面
+
+```bash
+API_BASE_URL=http://127.0.0.1:8000 streamlit run app/ui.py
+```
+
+### 4. 健康检查
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+## 默认数据库
+
+默认 SQLite 路径：
+
+- `data/app.db`
+
+也可以通过环境变量覆盖：
+
+```bash
+export AI_FINANCE_DB_PATH=/your/path/app.db
+```
+
+## 飞书通知配置
+
+如果要把新事件推到飞书群，先创建飞书自定义机器人，然后准备下面两个环境变量：
+
+```bash
+export AI_FINANCE_NOTIFICATION_CHANNEL=feishu_webhook
+export AI_FINANCE_FEISHU_WEBHOOK='https://open.feishu.cn/open-apis/bot/v2/hook/你的地址'
+export AI_FINANCE_FEISHU_SECRET='如果启用了签名校验，就填这里'
+```
+
+没有配置时，默认走 `stdout`，只在终端里打印消息。
+
+## CLI 用法
+
+### 扫描日线信号
+
+```bash
+python scripts/get_stock_data.py daily-signals --codes 600519,000001,300502
+python scripts/get_stock_data.py daily-signals --codes-file codes.txt --lookback-days 180 --max-workers 8
+```
+
+### 仅筛选“水下金叉后水上再次金叉”
+
+```bash
+python scripts/get_stock_data.py daily-signals \
+  --codes-file codes.txt \
+  --only-secondary-golden-cross
+```
+
+### 每日任务
+
+```bash
+python scripts/run_daily_scan.py --channel stdout
+python scripts/run_daily_scan.py --channel feishu_webhook
+```
+
+### 常驻任务进程
+
+```bash
+python scripts/run_scan_worker.py
+python scripts/run_scan_worker.py --run-once --channel feishu_webhook
+```
+
+### 复盘任务
+
+```bash
+python scripts/review_signal_outcomes.py
+python scripts/review_signal_outcomes.py --trade-date 2026-04-08 --summary-horizon T+3
+```
+
+## API 用法
+
+### 导入沪深300默认股票池
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/watchlists/default/import-index \
+  -H 'Content-Type: application/json' \
+  -d '{"index_code":"000300"}'
+```
+
+### 扫描日线信号
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/signals/daily \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "codes_text": "600519\n000001\n300502",
+    "lookback_days": 180,
+    "adjust": "qfq",
+    "max_workers": 8
+  }'
+```
+
+返回里会包含：
+
+- `count`
+- `requested_count`
+- `error_count`
+- `elapsed_seconds`
+- `items`
+- `errors`
+
+### 仅筛选“水下金叉后水上再次金叉”
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/signals/daily \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "codes_text": "600519\n000001\n300502",
+    "lookback_days": 180,
+    "adjust": "qfq",
+    "max_workers": 8,
+    "only_secondary_golden_cross": true
+  }'
+```
+
+### 扫描默认股票池并写入事件库
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/signals/scan-default \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "lookback_days": 180,
+    "adjust": "qfq",
+    "max_workers": 8
+  }'
+```
+
+## 页面用法
+
+页面入口：
+
+```bash
+streamlit run app/ui.py
+```
+
+重点标签页：
+
+- `日线信号扫描`
+  支持批量输入股票，支持勾选“仅保留水下金叉后水上再次金叉”
+- `今日提醒`
+  对默认股票池执行正式扫描并写入事件库，也可以直接选择通知渠道
+- `历史事件`
+  查看历史信号事件
+- `复盘统计`
+  查看 `T+1 / T+3 / T+5` 结果
+- `股票池`
+  支持导入 `沪深300`
+
+## 可用性设计
+
+这个仓库当前针对“能不能用”做了几件实际事情：
+
+- 扫描结果返回耗时、请求股票数、错误数
+- 页面能区分“没有命中信号”和“行情源连接失败”
+- 默认股票池与事件库持久化到 SQLite
+- 支持把扫描结果转成事件与复盘快照
+- 支持 CLI、API、UI 三种入口
+
+## 部署
+
+### Docker 部署
+
+仓库已提供：
+
+- `Dockerfile`
+- `docker-compose.yml`
+- `.env.example`
+- `.dockerignore`
+
+先准备环境变量：
+
+```bash
+cp .env.example .env
+```
+
+如果要发飞书，把 `.env` 里的这两项填上：
+
+```bash
+AI_FINANCE_NOTIFICATION_CHANNEL=feishu_webhook
+AI_FINANCE_FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/你的地址
+AI_FINANCE_FEISHU_SECRET=如果启用了签名校验就填这里
+```
+
+启动方式：
+
+```bash
+docker compose up --build -d
+```
+
+启动后默认端口：
+
+- API: `8000`
+- UI: `8501`
+
+启动后会同时起来 3 个服务：
+
+- `api`
+- `ui`
+- `worker`
+
+### 停止
+
+```bash
+docker compose down
+```
+
+### 持久化
+
+`docker-compose.yml` 会把本地 `./data` 挂载到容器内 `/app/data`，SQLite 数据不会因为容器重建而丢失。
+
+### 定时任务
+
+现在默认由独立 `worker` 服务负责定时扫描。默认配置是交易日 `15:05` 扫一次。可以在 `.env` 里改：
+
+```bash
+AI_FINANCE_WORKER_SCHEDULE_TIME=15:05
+AI_FINANCE_TIMEZONE=Asia/Shanghai
+AI_FINANCE_WORKER_POLL_SECONDS=30
+```
+
+如果你更想用宿主机调度器，也可以关掉 `worker`，自己定时执行：
+
+```bash
+python scripts/run_scan_worker.py --run-once --channel feishu_webhook
+```
+
+## 生产注意事项
+
+当前项目已经具备部署入口，但要达到稳定生产使用，还需要正视下面几个事实：
+
+- 日线行情当前仍然依赖公网数据源，远端偶发断连时会影响扫描成功率
+- SQLite 适合单机部署，不适合高并发多实例写入
+- 飞书通知依赖你自己提供有效 webhook；如果地址或签名不对，消息不会发出去
+- 通达信 `TdxQuant` 仍然依赖本地客户端环境，不适合纯容器化部署
+
+如果要把“真正可用”继续往前推进，建议优先做：
+
+1. 增加第二个稳定日线数据源
+2. 把通知内容升级成更适合群消息阅读的卡片样式
+3. 视部署规模把 SQLite 替换成 PostgreSQL
+
+## 自检
+
+```bash
+source .venv/bin/activate
+pytest -q
+python -m py_compile app/*.py scripts/get_stock_data.py scripts/run_daily_scan.py scripts/run_scan_worker.py scripts/review_signal_outcomes.py
+```
+
+## 当前验证范围
+
+本仓库当前已覆盖：
+
+- 新信号识别单测
+- API 参数透传单测
+- CLI 参数透传单测
+- 事件入库去重单测
+- 飞书通知发送与重试单测
+- worker 定时执行与命令入口单测
+
+如果你要继续往“可部署、可运维”推进，下一步应该补的是：
+
+- Docker 构建验证
+- 一次真实部署 smoke test
+- 飞书卡片消息

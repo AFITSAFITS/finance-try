@@ -1,0 +1,58 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-finance-api
+    command: uvicorn app.api:app --host 0.0.0.0 --port 8000
+    environment:
+      AI_FINANCE_DB_PATH: /app/data/app.db
+      AI_FINANCE_NOTIFICATION_CHANNEL: ${AI_FINANCE_NOTIFICATION_CHANNEL:-stdout}
+      AI_FINANCE_FEISHU_WEBHOOK: ${AI_FINANCE_FEISHU_WEBHOOK:-}
+      AI_FINANCE_FEISHU_SECRET: ${AI_FINANCE_FEISHU_SECRET:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-finance-ui
+    command: streamlit run app/ui.py --server.address 0.0.0.0 --server.port 8501
+    environment:
+      AI_FINANCE_DB_PATH: /app/data/app.db
+      API_BASE_URL: http://api:8000
+      AI_FINANCE_NOTIFICATION_CHANNEL: ${AI_FINANCE_NOTIFICATION_CHANNEL:-stdout}
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      STREAMLIT_SERVER_HEADLESS: "true"
+    depends_on:
+      - api
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-finance-worker
+    command: python scripts/run_scan_worker.py
+    environment:
+      AI_FINANCE_DB_PATH: /app/data/app.db
+      AI_FINANCE_NOTIFICATION_CHANNEL: ${AI_FINANCE_NOTIFICATION_CHANNEL:-stdout}
+      AI_FINANCE_FEISHU_WEBHOOK: ${AI_FINANCE_FEISHU_WEBHOOK:-}
+      AI_FINANCE_FEISHU_SECRET: ${AI_FINANCE_FEISHU_SECRET:-}
+      AI_FINANCE_WORKER_SCHEDULE_TIME: ${AI_FINANCE_WORKER_SCHEDULE_TIME:-15:05}
+      AI_FINANCE_TIMEZONE: ${AI_FINANCE_TIMEZONE:-Asia/Shanghai}
+      AI_FINANCE_WORKER_POLL_SECONDS: ${AI_FINANCE_WORKER_POLL_SECONDS:-30}
+      AI_FINANCE_LOOKBACK_DAYS: ${AI_FINANCE_LOOKBACK_DAYS:-180}
+      AI_FINANCE_ADJUST: ${AI_FINANCE_ADJUST:-qfq}
+      AI_FINANCE_MAX_WORKERS: ${AI_FINANCE_MAX_WORKERS:-8}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
