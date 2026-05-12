@@ -48,6 +48,9 @@ def seed_events() -> pd.DataFrame:
                 "风险提示": "接近60日高位",
                 "60日位置": 0.92,
                 "量能比": 1.35,
+                "参考止损": 9.2,
+                "参考目标": 11.6,
+                "风险收益比": 2.0,
             }
         ]
     )
@@ -82,16 +85,23 @@ def test_backfill_review_snapshots_and_stats(monkeypatch, tmp_path) -> None:
     assert t3_rows[0]["risk_note"] == "接近60日高位"
     assert t3_rows[0]["position_60d"] == 0.92
     assert t3_rows[0]["volume_ratio"] == 1.35
+    assert t3_rows[0]["stop_loss_price"] == 9.2
+    assert t3_rows[0]["target_price"] == 11.6
+    assert t3_rows[0]["risk_reward_ratio"] == 2.0
+    assert round(float(t3_rows[0]["stop_distance_pct"]), 4) == 8.0
 
     assert len(stats) == 2
     macd_stats = next(item for item in stats if item["summary"] == "MACD金叉")
     assert macd_stats["score_bucket"] == "60-80"
     assert macd_stats["signal_direction"] == "偏多"
     assert macd_stats["risk_bucket"] == "有风险提示"
+    assert macd_stats["risk_plan_bucket"] == "5-8%"
     assert macd_stats["sample_count"] == 1
     assert macd_stats["avg_return"] == 20.0
     assert macd_stats["win_rate"] == 1.0
     assert macd_stats["avg_position_60d"] == 0.92
     assert macd_stats["avg_volume_ratio"] == 1.35
+    assert macd_stats["avg_stop_distance_pct"] == 8.0
+    assert macd_stats["avg_risk_reward_ratio"] == 2.0
     assert macd_stats["strategy_verdict"] == "样本不足"
     assert "继续积累" in macd_stats["strategy_note"]

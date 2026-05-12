@@ -85,8 +85,29 @@ def _risk_bucket(value: object) -> str:
     return "有风险提示"
 
 
+def _stop_distance_bucket(value: object) -> str:
+    if value is None or pd.isna(value):
+        return "无风险计划"
+    distance = float(value)
+    if distance <= 5:
+        return "0-5%"
+    if distance <= 8:
+        return "5-8%"
+    return "8%+"
+
+
 def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
     payload = _parse_payload(row)
+    stop_loss_price = payload.get("stop_loss_price")
+    close_price = row.get("close_price")
+    stop_distance_pct = None
+    try:
+        close = float(close_price)
+        stop = float(stop_loss_price)
+        if close > 0 and 0 < stop < close:
+            stop_distance_pct = round((close - stop) / close * 100, 4)
+    except (TypeError, ValueError):
+        stop_distance_pct = None
     return {
         "id": row["id"],
         "signal_event_id": row["signal_event_id"],
@@ -107,6 +128,10 @@ def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
         "risk_note": payload.get("risk_note"),
         "position_60d": payload.get("position_60d"),
         "volume_ratio": payload.get("volume_ratio"),
+        "stop_loss_price": stop_loss_price,
+        "target_price": payload.get("target_price"),
+        "risk_reward_ratio": payload.get("risk_reward_ratio"),
+        "stop_distance_pct": stop_distance_pct,
         "updated_at": row["updated_at"],
     }
 
@@ -135,6 +160,7 @@ def list_review_snapshots(
         rows = conn.execute(
             f"""
             SELECT r.id, r.signal_event_id, e.trade_date, e.code, e.indicator, e.event_type, e.summary,
+                   e.close_price,
                    r.horizon, r.future_trade_date, r.future_close_price, r.pct_return,
                    r.max_drawdown, r.updated_at, e.payload_json
             FROM review_snapshots r
@@ -235,6 +261,7 @@ def backfill_review_snapshots(
                         saved = conn.execute(
                             """
                             SELECT r.id, r.signal_event_id, e.trade_date, e.code, e.indicator, e.event_type, e.summary,
+                                   e.close_price,
                                    r.horizon, r.future_trade_date, r.future_close_price, r.pct_return,
                                    r.max_drawdown, r.updated_at, e.payload_json
                             FROM review_snapshots r
@@ -274,8 +301,9 @@ def summarize_review_stats(
     df["score_bucket"] = df["signal_score"].map(_score_bucket)
     df["signal_direction"] = df["signal_direction"].fillna("未知")
     df["risk_bucket"] = df["risk_note"].map(_risk_bucket)
+    df["risk_plan_bucket"] = df["stop_distance_pct"].map(_stop_distance_bucket)
     grouped = (
-        df.groupby(["score_bucket", "signal_direction", "risk_bucket", "summary", "indicator", "event_type"], dropna=False)
+        df.groupby(["score_bucket", "signal_direction", "risk_bucket", "risk_plan_bucket", "summary", "indicator", "event_type"], dropna=False)
         .agg(
             sample_count=("pct_return", "count"),
             avg_return=("pct_return", "mean"),
@@ -283,6 +311,8 @@ def summarize_review_stats(
             avg_max_drawdown=("max_drawdown", "mean"),
             avg_position_60d=("position_60d", "mean"),
             avg_volume_ratio=("volume_ratio", "mean"),
+            avg_stop_distance_pct=("stop_distance_pct", "mean"),
+            avg_risk_reward_ratio=("risk_reward_ratio", "mean"),
         )
         .reset_index()
     )
@@ -303,6 +333,7 @@ def summarize_review_stats(
                 "score_bucket": row["score_bucket"],
                 "signal_direction": row["signal_direction"],
                 "risk_bucket": row["risk_bucket"],
+                "risk_plan_bucket": row["risk_plan_bucket"],
                 "summary": row["summary"],
                 "indicator": row["indicator"],
                 "event_type": row["event_type"],
@@ -316,10 +347,25 @@ def summarize_review_stats(
                 "avg_volume_ratio": round(float(row["avg_volume_ratio"]), 4)
                 if not pd.isna(row["avg_volume_ratio"])
                 else None,
+                "avg_stop_distance_pct": round(float(row["avg_stop_distance_pct"]), 4)
+                if not pd.isna(row["avg_stop_distance_pct"])
+                else None,
+                "avg_risk_reward_ratio": round(float(row["avg_risk_reward_ratio"]), 4)
+                if not pd.isna(row["avg_risk_reward_ratio"])
+                else None,
                 "strategy_verdict": decision["strategy_verdict"],
                 "strategy_note": decision["strategy_note"],
                 "horizon": horizon,
             }
         )
-    items.sort(key=lambda item: (item["score_bucket"], item["signal_direction"], item["risk_bucket"], -item["sample_count"], item["summary"]))
+    items.sort(
+        key=lambda item: (
+            item["score_bucket"],
+            item["signal_direction"],
+            item["risk_bucket"],
+            item["risk_plan_bucket"],
+            -item["sample_count"],
+            item["summary"],
+        )
+    )
     return items
