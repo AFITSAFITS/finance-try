@@ -33,6 +33,10 @@ def _signal_payload(row: dict[str, object]) -> dict[str, object]:
         "ma5": _clean_number(row.get("MA5")),
         "ma20": _clean_number(row.get("MA20")),
         "signal": row.get("信号"),
+        "signal_score": _clean_number(row.get("信号评分")),
+        "signal_direction": row.get("信号方向"),
+        "signal_level": row.get("信号级别"),
+        "score_reason": row.get("评分原因"),
     }
 
 
@@ -149,7 +153,7 @@ def persist_signal_rows(df: pd.DataFrame) -> list[dict[str, Any]]:
                 payload_json = json.dumps(event["payload"], ensure_ascii=False, sort_keys=True)
                 conn.execute(
                     """
-                    INSERT OR IGNORE INTO signal_events (
+                    INSERT INTO signal_events (
                         trade_date,
                         code,
                         indicator,
@@ -162,6 +166,14 @@ def persist_signal_rows(df: pd.DataFrame) -> list[dict[str, Any]]:
                         created_at
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(trade_date, code, indicator, event_type)
+                    DO UPDATE SET
+                        severity=excluded.severity,
+                        summary=excluded.summary,
+                        close_price=excluded.close_price,
+                        pct_change=excluded.pct_change,
+                        payload_json=excluded.payload_json,
+                        created_at=excluded.created_at
                     """,
                     (
                         event["trade_date"],

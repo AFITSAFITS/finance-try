@@ -22,6 +22,10 @@ def test_persist_signal_rows_dedupes_events(monkeypatch, tmp_path) -> None:
                 "MA20": 1498.3,
                 "均线信号": "MA5上穿MA20",
                 "信号": "MACD金叉, 水下金叉后水上再次金叉, MA5上穿MA20",
+                "信号评分": 88,
+                "信号方向": "偏多",
+                "信号级别": "重点",
+                "评分原因": "多指标共振",
             }
         ]
     )
@@ -40,3 +44,14 @@ def test_persist_signal_rows_dedupes_events(monkeypatch, tmp_path) -> None:
     }
     assert all(item["severity"] == "high" for item in history)
     assert history[0]["payload"]["close"] == 1530.25
+    assert history[0]["payload"]["signal_score"] == 88.0
+    assert history[0]["payload"]["signal_direction"] == "偏多"
+
+    updated_df = df.copy()
+    updated_df.loc[0, "信号评分"] = 72
+    updated_df.loc[0, "信号级别"] = "观察"
+    event_service.persist_signal_rows(updated_df)
+    updated_history = event_service.list_signal_events(trade_date="2026-04-08")
+    assert len(updated_history) == 3
+    assert updated_history[0]["payload"]["signal_score"] == 72.0
+    assert updated_history[0]["payload"]["signal_level"] == "观察"

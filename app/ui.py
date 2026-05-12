@@ -642,6 +642,9 @@ def main() -> None:
                     "trade_date",
                     "code",
                     "summary",
+                    "signal_score",
+                    "signal_direction",
+                    "signal_level",
                     "horizon",
                     "future_trade_date",
                     "future_close_price",
@@ -676,6 +679,7 @@ def main() -> None:
                 st.warning("当前条件下没有复盘统计数据。")
             else:
                 preferred_cols = [
+                    "score_bucket",
                     "summary",
                     "indicator",
                     "event_type",

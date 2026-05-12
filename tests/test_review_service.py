@@ -41,6 +41,10 @@ def seed_events() -> pd.DataFrame:
                 "MA20": 9.5,
                 "均线信号": "MA5上穿MA20",
                 "信号": "MACD金叉, MA5上穿MA20",
+                "信号评分": 75,
+                "信号方向": "偏多",
+                "信号级别": "观察",
+                "评分原因": "金叉叠加均线转强",
             }
         ]
     )
@@ -70,9 +74,12 @@ def test_backfill_review_snapshots_and_stats(monkeypatch, tmp_path) -> None:
     assert len(t3_rows) == 2
     assert t3_rows[0]["pct_return"] == 20.0
     assert t3_rows[0]["max_drawdown"] == -10.0
+    assert t3_rows[0]["signal_score"] == 75.0
+    assert t3_rows[0]["signal_direction"] == "偏多"
 
     assert len(stats) == 2
     macd_stats = next(item for item in stats if item["summary"] == "MACD金叉")
+    assert macd_stats["score_bucket"] == "60-80"
     assert macd_stats["sample_count"] == 1
     assert macd_stats["avg_return"] == 20.0
     assert macd_stats["win_rate"] == 1.0

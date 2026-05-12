@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
+import json
 from typing import Any, Callable, Iterable
 
 import pandas as pd
@@ -42,7 +43,7 @@ def _load_signal_events(
         rows = conn.execute(
             f"""
             SELECT id, trade_date, code, indicator, event_type, summary,
-                   close_price, pct_change
+                   close_price, pct_change, payload_json
             FROM signal_events
             {where_sql}
             ORDER BY trade_date ASC, code ASC, id ASC
@@ -52,7 +53,32 @@ def _load_signal_events(
     return [dict(row) for row in rows]
 
 
+def _parse_payload(row: dict[str, Any]) -> dict[str, Any]:
+    raw_payload = row.get("payload_json")
+    if not raw_payload:
+        return {}
+    try:
+        parsed = json.loads(str(raw_payload))
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _score_bucket(value: object) -> str:
+    if value is None or pd.isna(value):
+        return "未评分"
+    score = float(value)
+    if score <= 40:
+        return "0-40"
+    if score <= 60:
+        return "40-60"
+    if score <= 80:
+        return "60-80"
+    return "80+"
+
+
 def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
+    payload = _parse_payload(row)
     return {
         "id": row["id"],
         "signal_event_id": row["signal_event_id"],
@@ -66,6 +92,10 @@ def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
         "future_close_price": row["future_close_price"],
         "pct_return": row["pct_return"],
         "max_drawdown": row["max_drawdown"],
+        "signal_score": payload.get("signal_score"),
+        "signal_direction": payload.get("signal_direction"),
+        "signal_level": payload.get("signal_level"),
+        "score_reason": payload.get("score_reason"),
         "updated_at": row["updated_at"],
     }
 
@@ -95,7 +125,7 @@ def list_review_snapshots(
             f"""
             SELECT r.id, r.signal_event_id, e.trade_date, e.code, e.indicator, e.event_type, e.summary,
                    r.horizon, r.future_trade_date, r.future_close_price, r.pct_return,
-                   r.max_drawdown, r.updated_at
+                   r.max_drawdown, r.updated_at, e.payload_json
             FROM review_snapshots r
             JOIN signal_events e ON e.id = r.signal_event_id
             {where_sql}
@@ -195,7 +225,7 @@ def backfill_review_snapshots(
                             """
                             SELECT r.id, r.signal_event_id, e.trade_date, e.code, e.indicator, e.event_type, e.summary,
                                    r.horizon, r.future_trade_date, r.future_close_price, r.pct_return,
-                                   r.max_drawdown, r.updated_at
+                                   r.max_drawdown, r.updated_at, e.payload_json
                             FROM review_snapshots r
                             JOIN signal_events e ON e.id = r.signal_event_id
                             WHERE r.signal_event_id = ? AND r.horizon = ?
@@ -230,8 +260,9 @@ def summarize_review_stats(
         return []
 
     df = pd.DataFrame(snapshots)
+    df["score_bucket"] = df["signal_score"].map(_score_bucket)
     grouped = (
-        df.groupby(["summary", "indicator", "event_type"], dropna=False)
+        df.groupby(["score_bucket", "summary", "indicator", "event_type"], dropna=False)
         .agg(
             sample_count=("pct_return", "count"),
             avg_return=("pct_return", "mean"),
@@ -245,6 +276,7 @@ def summarize_review_stats(
     for _, row in grouped.iterrows():
         items.append(
             {
+                "score_bucket": row["score_bucket"],
                 "summary": row["summary"],
                 "indicator": row["indicator"],
                 "event_type": row["event_type"],
@@ -255,5 +287,5 @@ def summarize_review_stats(
                 "horizon": horizon,
             }
         )
-    items.sort(key=lambda item: (-item["sample_count"], item["summary"]))
+    items.sort(key=lambda item: (item["score_bucket"], -item["sample_count"], item["summary"]))
     return items

@@ -160,6 +160,7 @@ python scripts/get_stock_data.py daily-signals --codes-file codes.txt --min-scor
 ```
 
 扫描结果会带 `信号评分`、`信号方向`、`信号级别` 和 `评分原因`，可以用 `--min-score` 只保留更值得观察的信号。
+日线信号入库后会同步保存评分信息，复盘统计会按评分区间汇总，方便观察高分信号后续表现是否更稳定。
 
 ### 仅筛选“水下金叉后水上再次金叉”
 
@@ -455,8 +456,8 @@ python scripts/run_scan_worker.py --run-once --channel feishu_webhook
 
 如果要把“真正可用”继续往前推进，建议优先做：
 
-1. 增加第二个稳定日线数据源
-2. 把通知内容升级成更适合群消息阅读的卡片样式
+1. 增加更稳定的实时行情源和数据质量校验
+2. 扩充复盘样本，持续淘汰胜率不稳定的信号
 3. 视部署规模把 SQLite 替换成 PostgreSQL
 
 ## 自检
@@ -476,6 +477,7 @@ python scripts/deployment_smoke.py --require-watchlist
 - API 参数透传单测
 - CLI 参数透传单测
 - 事件入库去重单测
+- 信号评分入库与复盘分层统计单测
 - 飞书通知发送与重试单测
 - worker 定时执行与命令入口单测
 - 涨停突破候选扫描与保存单测

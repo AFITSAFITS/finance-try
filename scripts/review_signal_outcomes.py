@@ -81,8 +81,8 @@ def main() -> int:
         print("\nsummary_stats")
         for item in signal_stats:
             print(
-                f"{item['summary']} | horizon={item['horizon']} | samples={item['sample_count']} | "
-                f"avg_return={item['avg_return']} | win_rate={item['win_rate']} | "
+                f"score_bucket={item['score_bucket']} | {item['summary']} | horizon={item['horizon']} | "
+                f"samples={item['sample_count']} | avg_return={item['avg_return']} | win_rate={item['win_rate']} | "
                 f"avg_max_drawdown={item['avg_max_drawdown']}"
             )
     elif args.target in {"signals", "both"}:
