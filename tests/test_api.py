@@ -127,6 +127,49 @@ def test_thsdk_klines_success(monkeypatch) -> None:
     assert body["items"][0]["收盘价"] == 12.3
 
 
+def test_realtime_quotes_api(monkeypatch) -> None:
+    def fake_fetch_realtime_quotes_best_effort(codes):
+        assert codes == ["600519", "000001"]
+        return (
+            [
+                {
+                    "code": "600519",
+                    "name": "贵州茅台",
+                    "latest_price": 1354.55,
+                    "pct_change": -0.5,
+                    "source": "eastmoney",
+                }
+            ],
+            [{"股票代码": "000001", "error": "未返回实时行情"}],
+            "eastmoney",
+        )
+
+    monkeypatch.setattr(
+        api_module.realtime_quote_service,
+        "fetch_realtime_quotes_best_effort",
+        fake_fetch_realtime_quotes_best_effort,
+    )
+
+    resp = client.post(
+        "/api/market/realtime-quotes",
+        json={"codes_text": "600519\n000001"},
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source"] == "eastmoney"
+    assert body["count"] == 1
+    assert body["requested_count"] == 2
+    assert body["error_count"] == 1
+    assert body["items"][0]["latest_price"] == 1354.55
+
+
+def test_realtime_quotes_api_requires_codes() -> None:
+    resp = client.post("/api/market/realtime-quotes", json={"codes": [], "codes_text": ""})
+    assert resp.status_code == 400
+    assert "至少提供一个股票代码" in resp.json()["detail"]
+
+
 def test_thsdk_klines_unavailable(monkeypatch) -> None:
     def fake_klines_thsdk(**kwargs):
         raise thsdk_service.ThsdkUnavailableError("thsdk python runtime not found")

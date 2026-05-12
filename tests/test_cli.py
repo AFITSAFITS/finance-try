@@ -109,3 +109,47 @@ def test_daily_signals_cli_secondary_golden_cross_flag(monkeypatch, capsys, tmp_
     assert result == 0
     assert called["only_secondary_golden_cross"] is True
     assert "水下金叉后水上再次金叉" in output.out
+
+
+def test_realtime_quotes_cli_success(monkeypatch, capsys) -> None:
+    module = load_cli_module()
+
+    def fake_fetch_realtime_quotes_best_effort(codes):
+        assert codes == ["600519", "000001"]
+        return (
+            [
+                {
+                    "code": "600519",
+                    "name": "贵州茅台",
+                    "latest_price": 1354.55,
+                    "pct_change": -0.5,
+                    "source": "eastmoney",
+                }
+            ],
+            [{"股票代码": "000001", "error": "未返回实时行情"}],
+            "eastmoney",
+        )
+
+    monkeypatch.setattr(
+        module.realtime_quote_service,
+        "fetch_realtime_quotes_best_effort",
+        fake_fetch_realtime_quotes_best_effort,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT_PATH),
+            "realtime-quotes",
+            "--codes",
+            "600519,000001",
+        ],
+    )
+
+    result = module.main()
+    output = capsys.readouterr()
+
+    assert result == 0
+    assert "source=eastmoney" in output.out
+    assert "贵州茅台" in output.out
+    assert "WARNING [000001]: 未返回实时行情" in output.err

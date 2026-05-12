@@ -10,6 +10,7 @@ from app import bar_service
 from app import event_service
 from app import limit_up_service
 from app import notification_service
+from app import realtime_quote_service
 from app import review_service
 from app import scan_workflow
 from app import sector_rotation_service
@@ -35,6 +36,11 @@ class MoreInfoRequest(BaseModel):
     codes: list[str] = Field(default_factory=list)
     codes_text: str = ""
     fields: list[str] = Field(default_factory=lambda: ["HqDate", "Zjl", "Zjl_HB"])
+
+
+class RealtimeQuotesRequest(BaseModel):
+    codes: list[str] = Field(default_factory=list)
+    codes_text: str = ""
 
 
 class ThsdkKlinesRequest(BaseModel):
@@ -207,6 +213,28 @@ def api_more_info(req: MoreInfoRequest) -> dict[str, Any]:
         }
     except tdx_service.TdxUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/market/realtime-quotes")
+def api_realtime_quotes(req: RealtimeQuotesRequest) -> dict[str, Any]:
+    try:
+        codes = merge_codes(req.codes, req.codes_text)
+        if not codes:
+            raise ValueError("至少提供一个股票代码")
+        items, errors, source = realtime_quote_service.fetch_realtime_quotes_best_effort(codes)
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "requested_count": len(codes),
+            "error_count": len(errors),
+            "items": items,
+            "errors": errors,
+            "source": source,
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001

@@ -1,0 +1,200 @@
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from typing import Any, Callable
+
+import requests
+
+from app import signal_service
+from app import tdx_service
+
+EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/ulist.np/get"
+TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q={symbols}"
+
+
+def _clean_float(value: object) -> float | None:
+    if value is None:
+        return None
+    raw = str(value).strip().replace(",", "")
+    if raw in {"", "-", "None", "nan"}:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _market_prefix(code: str) -> str:
+    formatted = tdx_service.format_code(code)
+    return "sh" if formatted.startswith(("6", "9")) else "sz"
+
+
+def _eastmoney_secid(code: str) -> str:
+    formatted = tdx_service.format_code(code)
+    market = "1" if formatted.startswith(("6", "9")) else "0"
+    return f"{market}.{formatted}"
+
+
+def _tencent_symbol(code: str) -> str:
+    formatted = tdx_service.format_code(code)
+    return f"{_market_prefix(formatted)}{formatted}"
+
+
+def _call_provider_with_timeout(
+    provider_name: str,
+    provider: Callable[[], list[dict[str, Any]]],
+    timeout_seconds: float,
+) -> list[dict[str, Any]]:
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(provider)
+    try:
+        return future.result(timeout=timeout_seconds)
+    except FuturesTimeoutError as exc:
+        future.cancel()
+        raise TimeoutError(f"{provider_name} timeout after {timeout_seconds:g}s") from exc
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
+
+
+def fetch_realtime_quotes_eastmoney(
+    codes: list[str],
+    timeout: float = 10.0,
+    requester: Callable[..., object] = requests.get,
+) -> list[dict[str, Any]]:
+    normalized_codes = tdx_service.validate_codes(codes)
+    if not normalized_codes:
+        return []
+
+    response = requester(
+        EASTMONEY_QUOTE_URL,
+        params={
+            "fltt": "2",
+            "secids": ",".join(_eastmoney_secid(code) for code in normalized_codes),
+            "fields": "f12,f14,f2,f3,f4,f5,f6,f15,f16,f17,f18,f8,f10",
+        },
+        timeout=timeout,
+        headers=signal_service.EASTMONEY_HISTORY_HEADERS,
+    )
+    raise_for_status = getattr(response, "raise_for_status", None)
+    if callable(raise_for_status):
+        raise_for_status()
+
+    payload = response.json()
+    rows = ((payload.get("data") or {}).get("diff") or []) if isinstance(payload, dict) else []
+    by_code: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        code = tdx_service.format_code(row.get("f12"))
+        by_code[code] = {
+            "code": code,
+            "name": str(row.get("f14") or ""),
+            "latest_price": _clean_float(row.get("f2")),
+            "pct_change": _clean_float(row.get("f3")),
+            "change_amount": _clean_float(row.get("f4")),
+            "volume": _clean_float(row.get("f5")),
+            "amount": _clean_float(row.get("f6")),
+            "high": _clean_float(row.get("f15")),
+            "low": _clean_float(row.get("f16")),
+            "open": _clean_float(row.get("f17")),
+            "prev_close": _clean_float(row.get("f18")),
+            "turnover_rate": _clean_float(row.get("f8")),
+            "volume_ratio": _clean_float(row.get("f10")),
+            "source": "eastmoney",
+        }
+    return [by_code[code] for code in normalized_codes if code in by_code]
+
+
+def _split_tencent_records(text: str) -> list[list[str]]:
+    records: list[list[str]] = []
+    for raw_record in text.split(";"):
+        if "=" not in raw_record:
+            continue
+        _, raw_value = raw_record.split("=", 1)
+        value = raw_value.strip().strip('"')
+        if value:
+            records.append(value.split("~"))
+    return records
+
+
+def fetch_realtime_quotes_tencent(
+    codes: list[str],
+    timeout: float = 10.0,
+    requester: Callable[..., object] = requests.get,
+) -> list[dict[str, Any]]:
+    normalized_codes = tdx_service.validate_codes(codes)
+    if not normalized_codes:
+        return []
+
+    response = requester(
+        TENCENT_QUOTE_URL.format(symbols=",".join(_tencent_symbol(code) for code in normalized_codes)),
+        timeout=timeout,
+        headers=signal_service.EASTMONEY_HISTORY_HEADERS,
+    )
+    raise_for_status = getattr(response, "raise_for_status", None)
+    if callable(raise_for_status):
+        raise_for_status()
+    text = getattr(response, "text", "")
+    if not text and hasattr(response, "content"):
+        text = response.content.decode("gbk", errors="ignore")
+
+    by_code: dict[str, dict[str, Any]] = {}
+    for parts in _split_tencent_records(str(text)):
+        if len(parts) < 38:
+            continue
+        code = tdx_service.format_code(parts[2])
+        by_code[code] = {
+            "code": code,
+            "name": parts[1],
+            "latest_price": _clean_float(parts[3]),
+            "pct_change": _clean_float(parts[32]),
+            "change_amount": _clean_float(parts[31]),
+            "volume": _clean_float(parts[36]),
+            "amount": _clean_float(parts[37]),
+            "high": _clean_float(parts[33]),
+            "low": _clean_float(parts[34]),
+            "open": _clean_float(parts[5]),
+            "prev_close": _clean_float(parts[4]),
+            "turnover_rate": _clean_float(parts[38]) if len(parts) > 38 else None,
+            "volume_ratio": _clean_float(parts[49]) if len(parts) > 49 else None,
+            "source": "tencent",
+        }
+    return [by_code[code] for code in normalized_codes if code in by_code]
+
+
+def fetch_realtime_quotes_best_effort(
+    codes: list[str],
+    provider_timeout: float | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, str]], str]:
+    normalized_codes = tdx_service.validate_codes(codes)
+    timeout_seconds = signal_service.provider_timeout_seconds() if provider_timeout is None else max(0.05, float(provider_timeout))
+    errors: list[dict[str, str]] = []
+    items_by_code: dict[str, dict[str, Any]] = {}
+    used_sources: list[str] = []
+    providers: list[tuple[str, Callable[[], list[dict[str, Any]]]]] = [
+        ("eastmoney", lambda: fetch_realtime_quotes_eastmoney([code for code in normalized_codes if code not in items_by_code])),
+        ("tencent", lambda: fetch_realtime_quotes_tencent([code for code in normalized_codes if code not in items_by_code])),
+    ]
+
+    for provider_name, provider in providers:
+        missing_before_provider = [code for code in normalized_codes if code not in items_by_code]
+        if not missing_before_provider:
+            break
+        try:
+            items = _call_provider_with_timeout(provider_name, provider, timeout_seconds)
+            if items:
+                used_sources.append(provider_name)
+                for item in items:
+                    code = str(item.get("code", ""))
+                    if code in missing_before_provider:
+                        items_by_code[code] = item
+                continue
+            errors.append({"股票代码": "全部", "error": f"{provider_name}: empty"})
+        except Exception as exc:  # noqa: BLE001
+            errors.append({"股票代码": "全部", "error": f"{provider_name}: {exc}"})
+
+    missing = [code for code in normalized_codes if code not in items_by_code]
+    item_errors = [{"股票代码": code, "error": "未返回实时行情"} for code in missing]
+    items = [items_by_code[code] for code in normalized_codes if code in items_by_code]
+    source = "+".join(used_sources) if used_sources else "none"
+    if items:
+        return items, item_errors, source
+    return [], errors + item_errors, source

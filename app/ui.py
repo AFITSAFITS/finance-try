@@ -95,10 +95,11 @@ def main() -> None:
         st.markdown(
             "- 先启动 FastAPI: `uvicorn app.api:app --reload`\n"
             "- 再打开本页面: `streamlit run app/ui.py`\n"
-            "- 本页面调用 `/api/tdx/flow-rank`、`/api/signals/daily`、`/api/watchlists/default`、`/api/signals/scan-default`、`/api/signals/events` 与 `/api/thsdk/klines`。"
+            "- 本页面调用 `/api/tdx/flow-rank`、`/api/market/realtime-quotes`、`/api/signals/daily`、`/api/watchlists/default`、`/api/signals/scan-default`、`/api/signals/events` 与 `/api/thsdk/klines`。"
         )
     (
         flow_tab,
+        quote_tab,
         signal_tab,
         limit_up_tab,
         sector_tab,
@@ -110,6 +111,7 @@ def main() -> None:
     ) = st.tabs(
         [
             "主力净流入",
+            "实时行情",
             "日线信号扫描",
             "涨停突破",
             "板块轮动",
@@ -165,6 +167,48 @@ def main() -> None:
                 df = df[cols]
 
             show_downloadable_table(df, "tdx_flow_rank.csv")
+
+    with quote_tab:
+        st.caption("快速查看当前价格和涨跌情况；优先使用东方财富，失败时自动尝试腾讯。")
+        codes_text = st.text_area("股票代码（每行一个）", value=DEFAULT_CODES, height=160, key="quote_codes")
+        if st.button("查询实时行情", type="primary"):
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/market/realtime-quotes",
+                    payload={"codes_text": codes_text},
+                    timeout_seconds=60,
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"查询失败: {exc}")
+                st.stop()
+
+            st.caption(
+                f"as_of={data.get('as_of', '')} | source={data.get('source', 'unknown')} | "
+                f"count={data.get('count', 0)} | errors={data.get('error_count', 0)}"
+            )
+            for error in data.get("errors", []):
+                st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
+            df = pd.DataFrame(data.get("items", []))
+            if df.empty:
+                st.warning("没有取到实时行情。")
+            else:
+                cols = [
+                    "code",
+                    "name",
+                    "latest_price",
+                    "pct_change",
+                    "change_amount",
+                    "open",
+                    "high",
+                    "low",
+                    "prev_close",
+                    "turnover_rate",
+                    "volume_ratio",
+                    "amount",
+                    "source",
+                ]
+                show_downloadable_table(df[[c for c in cols if c in df.columns]], "realtime_quotes.csv")
 
     with signal_tab:
         st.caption("这里是临时扫描输入股票；如果要沉淀进复盘事件库，请使用“今日提醒”里的默认股票池扫描。")

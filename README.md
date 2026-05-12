@@ -15,6 +15,9 @@
 
 ## 当前能力
 
+- 实时行情快照
+  - 查询当前价格、涨跌幅、成交额
+  - 东方财富优先，腾讯兜底
 - 资金流查询
   - 通达信 `TdxQuant` 主力净流入
   - `AkShare` 兜底
@@ -191,6 +194,14 @@ python scripts/run_scan_worker.py --run-once --channel feishu_webhook
 python scripts/run_scan_worker.py --run-once --min-score 60
 ```
 
+### 实时行情快照
+
+```bash
+python scripts/get_stock_data.py realtime-quotes --codes 600519,000001
+```
+
+用于快速核对当前价格、涨跌幅和成交额。优先使用东方财富，失败时自动尝试腾讯。
+
 ### 复盘任务
 
 ```bash
@@ -259,6 +270,16 @@ curl -X POST http://127.0.0.1:8000/api/signals/daily \
 - `elapsed_seconds`
 - `items`
 - `errors`
+
+### 查询实时行情快照
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/market/realtime-quotes \
+  -H 'Content-Type: application/json' \
+  -d '{"codes":["600519","000001"]}'
+```
+
+返回里会包含当前价、涨跌幅、成交额、换手率、量比和数据来源。
 
 ### 仅筛选“水下金叉后水上再次金叉”
 

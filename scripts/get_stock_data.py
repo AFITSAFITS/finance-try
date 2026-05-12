@@ -21,6 +21,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from app import bar_service
 from app import limit_up_service
+from app import realtime_quote_service
 from app import sector_rotation_service
 from app import signal_service
 
@@ -232,6 +233,11 @@ def parse_args() -> argparse.Namespace:
     p_codes.add_argument("--codes", type=str, required=True, help="Comma-separated 6-digit codes")
     p_codes.add_argument("--output", type=str, default="")
 
+    p_quotes = sub.add_parser("realtime-quotes", help="Realtime quote snapshot from public providers.")
+    p_quotes.add_argument("--codes", type=str, default="", help="Comma-separated codes")
+    p_quotes.add_argument("--codes-file", type=str, default="", help="One code per line")
+    p_quotes.add_argument("--output", type=str, default="")
+
     p_tdx = sub.add_parser("tdx-more-info", help="TongDaXin TdxQuant get_more_info.")
     p_tdx.add_argument("--codes", type=str, required=True, help="Comma-separated codes")
     p_tdx.add_argument(
@@ -323,6 +329,37 @@ def main() -> int:
             df = flow_for_codes_akshare(codes)
             cols = ["股票代码", "股票简称", "最新价", "涨跌幅", "净额", "净流入(亿)"]
             print_df(df[cols], args.output or None)
+            return 0
+
+        if args.cmd == "realtime-quotes":
+            codes = load_codes(args.codes, args.codes_file)
+            if not codes:
+                raise SystemExit("请至少提供 --codes 或 --codes-file")
+            items, errors, source = realtime_quote_service.fetch_realtime_quotes_best_effort(codes)
+            for error in errors:
+                print(
+                    f"WARNING [{error.get('股票代码', '')}]: {error.get('error', '')}",
+                    file=sys.stderr,
+                )
+            print(f"source={source}")
+            df = pd.DataFrame(items)
+            cols = [
+                "code",
+                "name",
+                "latest_price",
+                "pct_change",
+                "change_amount",
+                "open",
+                "high",
+                "low",
+                "prev_close",
+                "turnover_rate",
+                "volume_ratio",
+                "amount",
+                "source",
+            ]
+            selected_cols = [col for col in cols if col in df.columns]
+            print_df(df[selected_cols] if selected_cols else df, args.output or None)
             return 0
 
         if args.cmd == "tdx-more-info":
