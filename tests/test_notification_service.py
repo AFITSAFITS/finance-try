@@ -54,6 +54,12 @@ def test_build_stdout_messages_formats_events() -> None:
                 "severity": "high",
                 "close_price": 1530.25,
                 "pct_change": 1.82,
+                "payload": {
+                    "signal_score": 75,
+                    "position_60d": 0.42,
+                    "volume_ratio": 1.6,
+                    "risk_note": "无明显风险",
+                },
             }
         ]
     )
@@ -61,6 +67,9 @@ def test_build_stdout_messages_formats_events() -> None:
     assert len(messages) == 1
     assert "600519" in messages[0]
     assert "MACD金叉" in messages[0]
+    assert "score=75" in messages[0]
+    assert "position_60d=0.42" in messages[0]
+    assert "risk=无明显风险" in messages[0]
 
 
 def test_build_feishu_webhook_payload_adds_signature(monkeypatch) -> None:
@@ -87,7 +96,14 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
             "event_type": "golden_cross",
             "close_price": 1530.25,
             "pct_change": 3.2,
-            "payload": {"signal": "MACD金叉, MA5上穿MA20"},
+            "payload": {
+                "signal": "MACD金叉, MA5上穿MA20",
+                "signal_score": 88,
+                "signal_level": "重点观察",
+                "position_60d": 0.35,
+                "volume_ratio": 1.8,
+                "risk_note": "无明显风险",
+            },
         },
         secret="secret",
     )
@@ -96,6 +112,13 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
     assert payload["card"]["header"]["template"] == "red"
     assert payload["card"]["header"]["title"]["content"] == "600519 MACD金叉"
     assert payload["card"]["elements"][0]["text"]["content"] == "**MACD金叉, MA5上穿MA20**"
+    fields = payload["card"]["elements"][1]["fields"]
+    field_text = "\n".join(str(item["text"]["content"]) for item in fields)
+    assert "**评分**\n88.00" in field_text
+    assert "**级别**\n重点观察" in field_text
+    assert "**60日位置**\n0.35" in field_text
+    assert "**量能比**\n1.80" in field_text
+    assert payload["card"]["elements"][2]["text"]["content"] == "**风险提示**\n无明显风险"
     assert payload["timestamp"] == "1710000000"
     assert payload["sign"] == "jWsBkWnzlRKtaP+iZgwraSojMWik4cJR7aysApQZuoA="
 
