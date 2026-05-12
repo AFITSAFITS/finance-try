@@ -18,12 +18,13 @@ def load_module():
 
 def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
     module = load_module()
+    called: dict[str, object] = {}
 
-    monkeypatch.setattr(
-        module.scan_workflow,
-        "run_default_watchlist_scan",
-        lambda **kwargs: {
+    def fake_run_default_watchlist_scan(**kwargs):
+        called.update(kwargs)
+        return {
             "watchlist": {"name": "默认股票池", "count": 2},
+            "min_score": kwargs["min_score"],
             "persisted_events": [
                 {"summary": "MACD金叉", "code": "600519"},
                 {"summary": "MA5上穿MA20", "code": "600519"},
@@ -33,18 +34,21 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
                 {"channel": "stdout", "status": "delivered", "created": True},
             ],
             "errors": [{"股票代码": "000001", "error": "network timeout"}],
-        },
-    )
+        }
+
+    monkeypatch.setattr(module.scan_workflow, "run_default_watchlist_scan", fake_run_default_watchlist_scan)
     monkeypatch.setattr(
         sys,
         "argv",
-        [str(DAILY_SCAN_SCRIPT), "--channel", "stdout"],
+        [str(DAILY_SCAN_SCRIPT), "--channel", "stdout", "--min-score", "70"],
     )
 
     result = module.main()
     captured = capsys.readouterr()
 
     assert result == 0
+    assert called["min_score"] == 70.0
+    assert "min_score=70.0" in captured.out
     assert "默认股票池" in captured.out
     assert "MACD金叉" in captured.out
     assert "WARNING [000001]: network timeout" in captured.err

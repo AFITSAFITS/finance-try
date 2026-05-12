@@ -16,6 +16,7 @@ def run_default_watchlist_scan(
     channel: str = "stdout",
     max_workers: int = 8,
     bootstrap_if_empty: bool = True,
+    min_score: float | None = 60.0,
 ) -> dict[str, Any]:
     if bootstrap_if_empty:
         watchlist = watchlist_service.ensure_default_watchlist()
@@ -32,6 +33,7 @@ def run_default_watchlist_scan(
         adjust=adjust.strip(),
         fetcher=bar_service.fetch_daily_history_cached,
         max_workers=int(max_workers),
+        min_score=min_score,
     )
     persisted_events = event_service.persist_signal_rows(signal_rows)
     delivery_results = notification_service.deliver_signal_events(
@@ -42,6 +44,7 @@ def run_default_watchlist_scan(
         "watchlist": watchlist,
         "requested_count": len(codes),
         "elapsed_seconds": round(time.perf_counter() - started_at, 3),
+        "min_score": min_score,
         "persisted_events": persisted_events,
         "delivery_results": delivery_results,
         "errors": errors,

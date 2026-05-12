@@ -40,7 +40,9 @@ def test_run_single_scan_job_invokes_scan_workflow(monkeypatch) -> None:
         lookback_days=180,
         adjust="qfq",
         max_workers=8,
+        min_score=70,
     )
 
     assert called["channel"] == "feishu_webhook"
+    assert called["min_score"] == 70.0
     assert result["watchlist"]["name"] == "默认股票池"

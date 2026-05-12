@@ -42,12 +42,14 @@ def run_single_scan_job(
     lookback_days: int = 180,
     adjust: str = "qfq",
     max_workers: int = 8,
+    min_score: float = 60.0,
 ) -> dict[str, Any]:
     return scan_workflow.run_default_watchlist_scan(
         lookback_days=int(lookback_days),
         adjust=adjust,
         channel=channel,
         max_workers=int(max_workers),
+        min_score=float(min_score),
     )
 
 
@@ -56,6 +58,7 @@ def run_worker_loop(
     lookback_days: int = 180,
     adjust: str = "qfq",
     max_workers: int = 8,
+    min_score: float = 60.0,
     schedule_time: str = "15:05",
     timezone_name: str = "Asia/Shanghai",
     poll_seconds: int = 30,
@@ -71,6 +74,7 @@ def run_worker_loop(
                 lookback_days=int(lookback_days),
                 adjust=adjust,
                 max_workers=int(max_workers),
+                min_score=float(min_score),
             )
             last_run_date = now.strftime("%Y-%m-%d")
             print(
@@ -78,6 +82,7 @@ def run_worker_loop(
                 f"watchlist={result['watchlist'].get('name', '')} "
                 f"count={result.get('requested_count', 0)} "
                 f"events={len(result.get('persisted_events', []))} "
+                f"min_score={result.get('min_score', '')} "
                 f"errors={len(result.get('errors', []))}"
             )
         time.sleep(max(1, int(poll_seconds)))

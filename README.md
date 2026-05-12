@@ -177,13 +177,17 @@ python scripts/get_stock_data.py daily-signals \
 ```bash
 python scripts/run_daily_scan.py --channel stdout
 python scripts/run_daily_scan.py --channel feishu_webhook
+python scripts/run_daily_scan.py --min-score 60
 ```
+
+每日任务默认只保存和通知评分 60 以上的信号；如果想保留全部信号，可以设置 `--min-score 0`。
 
 ### 常驻任务进程
 
 ```bash
 python scripts/run_scan_worker.py
 python scripts/run_scan_worker.py --run-once --channel feishu_webhook
+python scripts/run_scan_worker.py --run-once --min-score 60
 ```
 
 ### 复盘任务
@@ -438,6 +442,7 @@ AI_FINANCE_WORKER_SCHEDULE_TIME=15:05
 AI_FINANCE_TIMEZONE=Asia/Shanghai
 AI_FINANCE_WORKER_POLL_SECONDS=30
 AI_FINANCE_PROVIDER_TIMEOUT_SECONDS=12
+AI_FINANCE_DAILY_MIN_SCORE=60
 ```
 
 如果你更想用宿主机调度器，也可以关掉 `worker`，自己定时执行：

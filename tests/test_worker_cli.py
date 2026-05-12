@@ -26,6 +26,7 @@ def test_run_scan_worker_cli_run_once(monkeypatch, capsys) -> None:
             "watchlist": {"name": "默认股票池", "count": 2},
             "requested_count": 2,
             "elapsed_seconds": 1.2,
+            "min_score": kwargs["min_score"],
             "persisted_events": [],
             "delivery_results": [],
             "errors": [],
@@ -35,7 +36,7 @@ def test_run_scan_worker_cli_run_once(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         sys,
         "argv",
-        [str(WORKER_SCRIPT), "--run-once", "--channel", "feishu_webhook"],
+        [str(WORKER_SCRIPT), "--run-once", "--channel", "feishu_webhook", "--min-score", "70"],
     )
 
     result = module.main()
@@ -43,4 +44,6 @@ def test_run_scan_worker_cli_run_once(monkeypatch, capsys) -> None:
 
     assert result == 0
     assert called["channel"] == "feishu_webhook"
+    assert called["min_score"] == 70.0
+    assert "min_score=70.0" in captured.out
     assert "默认股票池" in captured.out

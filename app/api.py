@@ -72,6 +72,7 @@ class RunDailyJobRequest(BaseModel):
     adjust: str = "qfq"
     channel: str = "stdout"
     max_workers: int = Field(default=8, ge=1, le=32)
+    min_score: float = Field(default=60, ge=0, le=100)
 
 
 class BackfillReviewsRequest(BaseModel):
@@ -371,6 +372,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             adjust=req.adjust.strip(),
             channel=req.channel.strip() or "stdout",
             max_workers=int(req.max_workers),
+            min_score=float(req.min_score),
         )
         return {
             "as_of": tdx_service.now_ts(),
@@ -378,6 +380,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             "requested_count": int(result.get("requested_count", result["watchlist"].get("count", 0))),
             "error_count": len(result["errors"]),
             "elapsed_seconds": result.get("elapsed_seconds"),
+            "min_score": result.get("min_score"),
             "items": result["persisted_events"],
             "deliveries": result["delivery_results"],
             "errors": result["errors"],

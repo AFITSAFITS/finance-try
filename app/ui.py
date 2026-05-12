@@ -528,7 +528,7 @@ def main() -> None:
     with alerts_tab:
         st.caption("执行每日任务后，新的信号事件会写入 SQLite，并按通知渠道去重，便于后续自动化调度。")
         event_date = st.date_input("交易日", value=pd.Timestamp.now().date(), key="event_date")
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         notification_channel = c1.selectbox(
             "通知渠道",
             options=["stdout", "feishu_webhook"],
@@ -536,6 +536,7 @@ def main() -> None:
             key="job_notification_channel",
         )
         job_workers = int(c3.number_input("任务并发数", min_value=1, max_value=32, value=8, step=1, key="job_workers"))
+        job_min_score = float(c4.number_input("最低评分", min_value=0.0, max_value=100.0, value=60.0, step=5.0, key="job_min_score"))
         if notification_channel == "feishu_webhook":
             st.info("会向飞书机器人地址推送新事件。需要先在运行环境里配置 webhook。")
 
@@ -544,7 +545,7 @@ def main() -> None:
                 data = request_api(
                     api_base,
                     "/api/signals/run-daily-job",
-                    payload={"channel": notification_channel, "max_workers": job_workers},
+                    payload={"channel": notification_channel, "max_workers": job_workers, "min_score": job_min_score},
                     timeout_seconds=600,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -553,7 +554,8 @@ def main() -> None:
 
             st.caption(
                 f"as_of={data.get('as_of', '')} | source={data.get('source', 'unknown')} | "
-                f"watchlist={data.get('watchlist', {}).get('name', '')} | count={data.get('count', 0)}"
+                f"watchlist={data.get('watchlist', {}).get('name', '')} | "
+                f"min_score={data.get('min_score', '')} | count={data.get('count', 0)}"
             )
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("扫描股票数", data.get("requested_count", 0))

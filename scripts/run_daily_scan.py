@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -25,6 +26,12 @@ def parse_args() -> argparse.Namespace:
         help="Notification channel: stdout / feishu_webhook",
     )
     parser.add_argument("--max-workers", type=int, default=8, help="Parallel fetch workers")
+    parser.add_argument(
+        "--min-score",
+        type=float,
+        default=float(os.getenv("AI_FINANCE_DAILY_MIN_SCORE", "60")),
+        help="Minimum signal score to persist and notify; use 0 to keep all signals",
+    )
     return parser.parse_args()
 
 
@@ -36,6 +43,7 @@ def main() -> int:
             adjust=args.adjust,
             channel=args.channel,
             max_workers=int(args.max_workers),
+            min_score=float(args.min_score),
         )
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -49,6 +57,7 @@ def main() -> int:
         f"watchlist={watchlist.get('name', '')} "
         f"count={watchlist.get('count', 0)} "
         f"source={result.get('watchlist_source', 'existing')} "
+        f"min_score={result.get('min_score', '')} "
         f"events={len(result['persisted_events'])} "
         f"deliveries={len(result['delivery_results'])}"
     )

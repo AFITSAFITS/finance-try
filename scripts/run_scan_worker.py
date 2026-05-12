@@ -19,6 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lookback-days", type=int, default=int(os.getenv("AI_FINANCE_LOOKBACK_DAYS", "180")))
     parser.add_argument("--adjust", type=str, default=os.getenv("AI_FINANCE_ADJUST", "qfq"))
     parser.add_argument("--max-workers", type=int, default=int(os.getenv("AI_FINANCE_MAX_WORKERS", "8")))
+    parser.add_argument("--min-score", type=float, default=float(os.getenv("AI_FINANCE_DAILY_MIN_SCORE", "60")))
     parser.add_argument(
         "--schedule-time",
         type=str,
@@ -49,10 +50,12 @@ def main() -> int:
                 lookback_days=int(args.lookback_days),
                 adjust=args.adjust,
                 max_workers=int(args.max_workers),
+                min_score=float(args.min_score),
             )
             print(
                 f"watchlist={result['watchlist'].get('name', '')} "
                 f"count={result.get('requested_count', 0)} "
+                f"min_score={result.get('min_score', '')} "
                 f"events={len(result.get('persisted_events', []))} "
                 f"errors={len(result.get('errors', []))}"
             )
@@ -63,6 +66,7 @@ def main() -> int:
             lookback_days=int(args.lookback_days),
             adjust=args.adjust,
             max_workers=int(args.max_workers),
+            min_score=float(args.min_score),
             schedule_time=args.schedule_time,
             timezone_name=args.timezone,
             poll_seconds=int(args.poll_seconds),

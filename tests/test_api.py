@@ -318,6 +318,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
 
     def fake_run_default_watchlist_scan(**kwargs):
         assert kwargs["channel"] == "stdout"
+        assert kwargs["min_score"] == 70.0
         return {
             "watchlist": {"name": "默认股票池", "count": 2},
             "persisted_events": [{"summary": "MACD金叉", "code": "600519"}],
@@ -325,13 +326,14 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
             "errors": [{"股票代码": "000001", "error": "network timeout"}],
             "requested_count": 2,
             "elapsed_seconds": 12.5,
+            "min_score": kwargs["min_score"],
         }
 
     monkeypatch.setattr(api_module.scan_workflow, "run_default_watchlist_scan", fake_run_default_watchlist_scan)
 
     resp = client.post(
         "/api/signals/run-daily-job",
-        json={"channel": "stdout"},
+        json={"channel": "stdout", "min_score": 70},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -339,6 +341,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
     assert body["requested_count"] == 2
     assert body["error_count"] == 1
     assert body["elapsed_seconds"] == 12.5
+    assert body["min_score"] == 70.0
     assert body["deliveries"][0]["channel"] == "stdout"
     assert body["errors"][0]["股票代码"] == "000001"
 
@@ -348,6 +351,7 @@ def test_run_daily_job_passes_feishu_channel(monkeypatch, tmp_path) -> None:
 
     def fake_run_default_watchlist_scan(**kwargs):
         assert kwargs["channel"] == "feishu_webhook"
+        assert kwargs["min_score"] == 60.0
         return {
             "watchlist": {"name": "默认股票池", "count": 1},
             "persisted_events": [],
@@ -355,6 +359,7 @@ def test_run_daily_job_passes_feishu_channel(monkeypatch, tmp_path) -> None:
             "errors": [],
             "requested_count": 1,
             "elapsed_seconds": 1.5,
+            "min_score": kwargs["min_score"],
         }
 
     monkeypatch.setattr(api_module.scan_workflow, "run_default_watchlist_scan", fake_run_default_watchlist_scan)

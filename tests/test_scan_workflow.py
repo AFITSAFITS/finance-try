@@ -17,6 +17,7 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch) -> N
 
     def fake_scan_stock_signal_events(**kwargs):
         assert kwargs["codes"] == ["600519"]
+        assert kwargs["min_score"] == 60.0
         return pd.DataFrame(), []
 
     monkeypatch.setattr(scan_workflow.watchlist_service, "ensure_default_watchlist", fake_ensure_default_watchlist)
@@ -27,5 +28,6 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch) -> N
     result = scan_workflow.run_default_watchlist_scan()
 
     assert result["requested_count"] == 1
+    assert result["min_score"] == 60.0
     assert result["watchlist_source"] == "seed"
     assert result["watchlist_message"] == "已使用内置种子股票池"

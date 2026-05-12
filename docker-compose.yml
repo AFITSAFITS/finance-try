@@ -65,6 +65,7 @@ services:
       AI_FINANCE_LOOKBACK_DAYS: ${AI_FINANCE_LOOKBACK_DAYS:-180}
       AI_FINANCE_ADJUST: ${AI_FINANCE_ADJUST:-qfq}
       AI_FINANCE_MAX_WORKERS: ${AI_FINANCE_MAX_WORKERS:-8}
+      AI_FINANCE_DAILY_MIN_SCORE: ${AI_FINANCE_DAILY_MIN_SCORE:-60}
     volumes:
       - ./data:/app/data
     restart: unless-stopped
