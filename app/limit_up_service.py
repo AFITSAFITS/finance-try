@@ -428,23 +428,7 @@ def _load_limit_up_candidates(
 
 
 def _cached_daily_bars_to_history_df(rows: list[dict[str, Any]]) -> pd.DataFrame:
-    return pd.DataFrame(
-        [
-            {
-                "日期": row["trade_date"],
-                "股票代码": row["code"],
-                "开盘": row["open"],
-                "收盘": row["close"],
-                "最高": row["high"],
-                "最低": row["low"],
-                "成交量": row["volume"],
-                "成交额": row["amount"],
-                "涨跌幅": row["pct_change"],
-                "换手率": row["turnover_rate"],
-            }
-            for row in rows
-        ]
-    )
+    return bar_service.cached_daily_bars_to_history_df(rows)
 
 
 def fetch_daily_history_range_with_cache(
@@ -455,11 +439,7 @@ def fetch_daily_history_range_with_cache(
 ) -> pd.DataFrame:
     start = normalize_trade_date(start_date)
     end = normalize_trade_date(end_date)
-    cached_rows = [
-        row
-        for row in bar_service.list_daily_bars(code, adjust=adjust)
-        if start <= str(row["trade_date"]) <= end
-    ]
+    cached_rows = bar_service.list_daily_bars_range(code, start, end, adjust=adjust)
     if cached_rows:
         return signal_service.normalize_history_df(
             _cached_daily_bars_to_history_df(cached_rows),

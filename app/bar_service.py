@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import pandas as pd
@@ -24,6 +24,57 @@ def fetch_daily_history_range_akshare(
         end_date=finish,
         adjust=adjust,
     )
+
+
+def cached_daily_bars_to_history_df(rows: list[dict[str, Any]]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "日期": row["trade_date"],
+                "股票代码": row["code"],
+                "开盘": row["open"],
+                "收盘": row["close"],
+                "最高": row["high"],
+                "最低": row["low"],
+                "成交量": row["volume"],
+                "成交额": row["amount"],
+                "涨跌幅": row["pct_change"],
+                "换手率": row["turnover_rate"],
+            }
+            for row in rows
+        ]
+    )
+
+
+def _cached_rows_are_usable(rows: list[dict[str, Any]], lookback_days: int) -> bool:
+    if not rows:
+        return False
+    today = datetime.now().strftime("%Y-%m-%d")
+    if not any(str(row.get("fetched_at", "")).startswith(today) for row in rows):
+        return False
+    min_rows = 35 if int(lookback_days) >= 60 else 15
+    return len(rows) >= min_rows
+
+
+def fetch_daily_history_cached(
+    code: str,
+    lookback_days: int = 180,
+    adjust: str = "qfq",
+) -> pd.DataFrame:
+    end_dt = datetime.now()
+    start_dt = end_dt - timedelta(days=int(lookback_days))
+    start = start_dt.strftime("%Y-%m-%d")
+    end = end_dt.strftime("%Y-%m-%d")
+    cached_rows = list_daily_bars_range(code, start, end, adjust=adjust)
+    if _cached_rows_are_usable(cached_rows, lookback_days):
+        return signal_service.normalize_history_df(
+            cached_daily_bars_to_history_df(cached_rows),
+            code,
+        )
+
+    fetched = fetch_daily_history_range_akshare(code, start, end, adjust)
+    upsert_daily_bars(code, fetched, adjust=adjust)
+    return fetched
 
 
 def _to_number(row: pd.Series, column: str) -> float | None:
@@ -101,5 +152,28 @@ def list_daily_bars(
             ORDER BY trade_date ASC
             """,
             (tdx_service.format_code(code), adjust, source),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_daily_bars_range(
+    code: str,
+    start_date: str,
+    end_date: str,
+    adjust: str = "qfq",
+    source: str = "akshare",
+) -> list[dict[str, Any]]:
+    start = pd.to_datetime(start_date).strftime("%Y-%m-%d")
+    end = pd.to_datetime(end_date).strftime("%Y-%m-%d")
+    with db.get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT code, trade_date, open, close, high, low, volume, amount,
+                   pct_change, turnover_rate, adjust, source, fetched_at
+            FROM daily_bars
+            WHERE code = ? AND adjust = ? AND source = ? AND trade_date BETWEEN ? AND ?
+            ORDER BY trade_date ASC
+            """,
+            (tdx_service.format_code(code), adjust, source, start, end),
         ).fetchall()
     return [dict(row) for row in rows]

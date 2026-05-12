@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from app import bar_service
 from app import event_service
 from app import notification_service
 from app import signal_service
@@ -29,6 +30,7 @@ def run_default_watchlist_scan(
         codes=codes,
         lookback_days=int(lookback_days),
         adjust=adjust.strip(),
+        fetcher=bar_service.fetch_daily_history_cached,
         max_workers=int(max_workers),
     )
     persisted_events = event_service.persist_signal_rows(signal_rows)

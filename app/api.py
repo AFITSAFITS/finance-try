@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app import bar_service
 from app import event_service
 from app import limit_up_service
 from app import notification_service
@@ -246,6 +247,7 @@ def api_daily_signals(req: DailySignalsRequest) -> dict[str, Any]:
             codes=codes,
             lookback_days=int(req.lookback_days),
             adjust=req.adjust.strip(),
+            fetcher=bar_service.fetch_daily_history_cached,
             max_workers=int(req.max_workers),
             only_secondary_golden_cross=bool(req.only_secondary_golden_cross),
             min_score=req.min_score,
@@ -315,6 +317,7 @@ def api_scan_default_signals(req: ScanDefaultSignalsRequest) -> dict[str, Any]:
             codes=codes,
             lookback_days=int(req.lookback_days),
             adjust=req.adjust.strip(),
+            fetcher=bar_service.fetch_daily_history_cached,
             max_workers=int(req.max_workers),
         )
         items = event_service.persist_signal_rows(df)

@@ -19,6 +19,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from app import bar_service
 from app import limit_up_service
 from app import sector_rotation_service
 from app import signal_service
@@ -339,6 +340,7 @@ def main() -> int:
                 codes=codes,
                 lookback_days=int(args.lookback_days),
                 adjust=args.adjust,
+                fetcher=bar_service.fetch_daily_history_cached,
                 max_workers=int(args.max_workers),
                 only_secondary_golden_cross=bool(args.only_secondary_golden_cross),
                 min_score=float(args.min_score),
