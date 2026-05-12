@@ -375,6 +375,8 @@ def main() -> int:
                 "pct_change",
                 "turnover_rate",
                 "consecutive_boards",
+                "sector_limit_up_count",
+                "sector_heat_rank",
                 "score",
                 "reason",
             ]

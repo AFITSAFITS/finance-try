@@ -108,6 +108,8 @@ CREATE TABLE IF NOT EXISTS limit_up_candidates (
     pct_change REAL,
     turnover_rate REAL,
     consecutive_boards INTEGER,
+    sector_limit_up_count INTEGER,
+    sector_heat_rank INTEGER,
     first_limit_time TEXT NOT NULL DEFAULT '',
     last_limit_time TEXT NOT NULL DEFAULT '',
     open_board_count INTEGER,
@@ -143,6 +145,11 @@ CREATE INDEX IF NOT EXISTS idx_sector_rotation_trade_date ON sector_rotation_sna
 CREATE INDEX IF NOT EXISTS idx_sector_rotation_score ON sector_rotation_snapshots(rotation_score);
 """
 
+MIGRATIONS_SQL = [
+    "ALTER TABLE limit_up_candidates ADD COLUMN sector_limit_up_count INTEGER",
+    "ALTER TABLE limit_up_candidates ADD COLUMN sector_heat_rank INTEGER",
+]
+
 
 def get_db_path() -> Path:
     override = os.getenv("AI_FINANCE_DB_PATH", "").strip()
@@ -153,6 +160,12 @@ def _configure_connection(conn: sqlite3.Connection) -> None:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA_SQL)
+    for statement in MIGRATIONS_SQL:
+        try:
+            conn.execute(statement)
+        except sqlite3.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
 
 
 @contextmanager

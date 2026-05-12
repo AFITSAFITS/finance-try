@@ -278,6 +278,8 @@ def main() -> None:
                     "pct_change",
                     "turnover_rate",
                     "consecutive_boards",
+                    "sector_limit_up_count",
+                    "sector_heat_rank",
                     "score",
                     "reason",
                 ]
@@ -300,7 +302,19 @@ def main() -> None:
             if df.empty:
                 st.warning("没有已保存的涨停突破候选。")
             else:
-                cols = ["trade_date", "code", "name", "sector", "close_price", "pct_change", "score", "reason", "created_at"]
+                cols = [
+                    "trade_date",
+                    "code",
+                    "name",
+                    "sector",
+                    "close_price",
+                    "pct_change",
+                    "sector_limit_up_count",
+                    "sector_heat_rank",
+                    "score",
+                    "reason",
+                    "created_at",
+                ]
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "limit_up_breakthrough_history.csv")
 
     with sector_tab:

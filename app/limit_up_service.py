@@ -21,6 +21,8 @@ LIMIT_UP_OUTPUT_COLUMNS = [
     "pct_change",
     "turnover_rate",
     "consecutive_boards",
+    "sector_limit_up_count",
+    "sector_heat_rank",
     "score",
     "reason",
 ]
@@ -98,9 +100,28 @@ def normalize_limit_up_pool(df: pd.DataFrame, trade_date: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def build_sector_heat_map(pool_df: pd.DataFrame) -> dict[str, dict[str, int]]:
+    if pool_df.empty or "sector" not in pool_df.columns:
+        return {}
+    counts = (
+        pool_df["sector"]
+        .fillna("")
+        .map(lambda value: str(value).strip() or "未分类")
+        .value_counts()
+    )
+    heat_map: dict[str, dict[str, int]] = {}
+    for rank, (sector, count) in enumerate(counts.items(), start=1):
+        heat_map[sector] = {
+            "sector_limit_up_count": int(count),
+            "sector_heat_rank": int(rank),
+        }
+    return heat_map
+
+
 def analyze_limit_up_candidate(
     row: dict[str, object],
     lookback_days: int = 120,
+    sector_heat: dict[str, int] | None = None,
     history_fetcher: Callable[[str, int, str], pd.DataFrame] = signal_service.fetch_daily_history_akshare,
 ) -> dict[str, object]:
     code = str(row["code"])
@@ -169,6 +190,26 @@ def analyze_limit_up_candidate(
         score += 5
         reasons.append("封板过程中未明显开板")
 
+    if sector_heat:
+        sector_count = int(sector_heat.get("sector_limit_up_count", 0))
+        sector_rank = int(sector_heat.get("sector_heat_rank", 0))
+        row["sector_limit_up_count"] = sector_count
+        row["sector_heat_rank"] = sector_rank
+        payload["sector_limit_up_count"] = sector_count
+        payload["sector_heat_rank"] = sector_rank
+        if sector_count >= 5:
+            score += 15
+            reasons.append(f"所属板块当日{sector_count}只涨停，共振明显")
+        elif sector_count >= 3:
+            score += 10
+            reasons.append(f"所属板块当日{sector_count}只涨停")
+        elif sector_count >= 2:
+            score += 5
+            reasons.append("所属板块有涨停共振")
+        if 0 < sector_rank <= 3:
+            score += 5
+            reasons.append("所属板块涨停热度靠前")
+
     enriched = dict(row)
     enriched["score"] = round(score, 2)
     enriched["reason"] = "；".join(reasons) if reasons else "涨停入池，K线数据不足"
@@ -190,6 +231,7 @@ def scan_limit_up_breakthroughs(
         pool_df = normalize_limit_up_pool(pool_fetcher(normalized_date), normalized_date)
     except Exception as exc:  # noqa: BLE001
         return [], [{"股票代码": "全部", "error": str(exc)}]
+    sector_heat_map = build_sector_heat_map(pool_df)
     candidates: list[dict[str, object]] = []
     errors: list[dict[str, str]] = []
 
@@ -199,6 +241,7 @@ def scan_limit_up_breakthroughs(
             candidate = analyze_limit_up_candidate(
                 row,
                 lookback_days=int(lookback_days),
+                sector_heat=sector_heat_map.get(str(row.get("sector", "")).strip() or "未分类"),
                 history_fetcher=history_fetcher,
             )
             if float(candidate["score"]) >= float(min_score):
@@ -221,6 +264,8 @@ def _row_to_candidate(row: sqlite3.Row) -> dict[str, Any]:
         "pct_change": row["pct_change"],
         "turnover_rate": row["turnover_rate"],
         "consecutive_boards": row["consecutive_boards"],
+        "sector_limit_up_count": row["sector_limit_up_count"],
+        "sector_heat_rank": row["sector_heat_rank"],
         "first_limit_time": row["first_limit_time"],
         "last_limit_time": row["last_limit_time"],
         "open_board_count": row["open_board_count"],
@@ -240,10 +285,11 @@ def persist_limit_up_candidates(candidates: list[dict[str, object]]) -> list[dic
                 """
                 INSERT INTO limit_up_candidates (
                     trade_date, code, name, sector, close_price, pct_change, turnover_rate,
-                    consecutive_boards, first_limit_time, last_limit_time, open_board_count,
+                    consecutive_boards, sector_limit_up_count, sector_heat_rank,
+                    first_limit_time, last_limit_time, open_board_count,
                     score, reason, payload_json, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(trade_date, code) DO UPDATE SET
                     name = excluded.name,
                     sector = excluded.sector,
@@ -251,6 +297,8 @@ def persist_limit_up_candidates(candidates: list[dict[str, object]]) -> list[dic
                     pct_change = excluded.pct_change,
                     turnover_rate = excluded.turnover_rate,
                     consecutive_boards = excluded.consecutive_boards,
+                    sector_limit_up_count = excluded.sector_limit_up_count,
+                    sector_heat_rank = excluded.sector_heat_rank,
                     first_limit_time = excluded.first_limit_time,
                     last_limit_time = excluded.last_limit_time,
                     open_board_count = excluded.open_board_count,
@@ -268,6 +316,8 @@ def persist_limit_up_candidates(candidates: list[dict[str, object]]) -> list[dic
                     item.get("pct_change"),
                     item.get("turnover_rate"),
                     item.get("consecutive_boards"),
+                    item.get("sector_limit_up_count"),
+                    item.get("sector_heat_rank"),
                     item.get("first_limit_time", ""),
                     item.get("last_limit_time", ""),
                     item.get("open_board_count"),
@@ -280,7 +330,8 @@ def persist_limit_up_candidates(candidates: list[dict[str, object]]) -> list[dic
             row = conn.execute(
                 """
                 SELECT id, trade_date, code, name, sector, close_price, pct_change, turnover_rate,
-                       consecutive_boards, first_limit_time, last_limit_time, open_board_count,
+                       consecutive_boards, sector_limit_up_count, sector_heat_rank,
+                       first_limit_time, last_limit_time, open_board_count,
                        score, reason, payload_json, created_at
                 FROM limit_up_candidates
                 WHERE trade_date = ? AND code = ?
@@ -323,7 +374,8 @@ def list_limit_up_candidates(
         rows = conn.execute(
             f"""
             SELECT id, trade_date, code, name, sector, close_price, pct_change, turnover_rate,
-                   consecutive_boards, first_limit_time, last_limit_time, open_board_count,
+                   consecutive_boards, sector_limit_up_count, sector_heat_rank,
+                   first_limit_time, last_limit_time, open_board_count,
                    score, reason, payload_json, created_at
             FROM limit_up_candidates
             {where_sql}
