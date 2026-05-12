@@ -381,6 +381,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             "error_count": len(result["errors"]),
             "elapsed_seconds": result.get("elapsed_seconds"),
             "min_score": result.get("min_score"),
+            "notification_count": len(result.get("notification_events", [])),
             "items": result["persisted_events"],
             "deliveries": result["delivery_results"],
             "errors": result["errors"],
@@ -395,7 +396,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             },
             "messages": notification_service.build_stdout_messages(
                 select_newly_delivered_events(
-                    result["persisted_events"],
+                    result.get("notification_events", result["persisted_events"]),
                     result["delivery_results"],
                 )
             ),

@@ -5,6 +5,39 @@ import pandas as pd
 from app import scan_workflow
 
 
+def test_select_representative_notification_events_keeps_one_per_stock_date() -> None:
+    events = [
+        {
+            "id": 1,
+            "trade_date": "2026-05-12",
+            "code": "600001",
+            "severity": "normal",
+            "event_type": "ma5_cross_up_ma20",
+            "payload": {"signal_score": 70},
+        },
+        {
+            "id": 2,
+            "trade_date": "2026-05-12",
+            "code": "600001",
+            "severity": "high",
+            "event_type": "secondary_golden_cross_above_zero",
+            "payload": {"signal_score": 85},
+        },
+        {
+            "id": 3,
+            "trade_date": "2026-05-12",
+            "code": "600002",
+            "severity": "normal",
+            "event_type": "golden_cross",
+            "payload": {"signal_score": 75},
+        },
+    ]
+
+    selected = scan_workflow.select_representative_notification_events(events)
+
+    assert [item["id"] for item in selected] == [2, 3]
+
+
 def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch) -> None:
     def fake_ensure_default_watchlist():
         return {
@@ -22,12 +55,39 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch) -> N
 
     monkeypatch.setattr(scan_workflow.watchlist_service, "ensure_default_watchlist", fake_ensure_default_watchlist)
     monkeypatch.setattr(scan_workflow.signal_service, "scan_stock_signal_events", fake_scan_stock_signal_events)
-    monkeypatch.setattr(scan_workflow.event_service, "persist_signal_rows", lambda df: [])
-    monkeypatch.setattr(scan_workflow.notification_service, "deliver_signal_events", lambda events, channel: [])
+    saved_events = [
+        {
+            "id": 1,
+            "trade_date": "2026-05-12",
+            "code": "600519",
+            "severity": "normal",
+            "event_type": "golden_cross",
+            "payload": {"signal_score": 70},
+        },
+        {
+            "id": 2,
+            "trade_date": "2026-05-12",
+            "code": "600519",
+            "severity": "high",
+            "event_type": "secondary_golden_cross_above_zero",
+            "payload": {"signal_score": 85},
+        },
+    ]
+    delivered: dict[str, object] = {}
+
+    def fake_deliver_signal_events(events, channel):
+        delivered["ids"] = [item["id"] for item in events]
+        return [{"signal_event_id": item["id"], "created": True} for item in events]
+
+    monkeypatch.setattr(scan_workflow.event_service, "persist_signal_rows", lambda df: saved_events)
+    monkeypatch.setattr(scan_workflow.notification_service, "deliver_signal_events", fake_deliver_signal_events)
 
     result = scan_workflow.run_default_watchlist_scan()
 
     assert result["requested_count"] == 1
     assert result["min_score"] == 60.0
+    assert [item["id"] for item in result["persisted_events"]] == [1, 2]
+    assert [item["id"] for item in result["notification_events"]] == [2]
+    assert delivered["ids"] == [2]
     assert result["watchlist_source"] == "seed"
     assert result["watchlist_message"] == "已使用内置种子股票池"

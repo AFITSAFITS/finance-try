@@ -59,6 +59,7 @@ def main() -> int:
         f"source={result.get('watchlist_source', 'existing')} "
         f"min_score={result.get('min_score', '')} "
         f"events={len(result['persisted_events'])} "
+        f"notification_events={len(result.get('notification_events', []))} "
         f"deliveries={len(result['delivery_results'])}"
     )
     if result.get("watchlist_message"):
@@ -67,7 +68,7 @@ def main() -> int:
         print(f"WARNING [watchlist]: {result['watchlist_warning']}", file=sys.stderr)
 
     new_events = select_newly_delivered_events(
-        result["persisted_events"],
+        result.get("notification_events", result["persisted_events"]),
         result["delivery_results"],
     )
     for message in notification_service.build_stdout_messages(new_events):

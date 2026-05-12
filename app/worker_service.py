@@ -82,6 +82,7 @@ def run_worker_loop(
                 f"watchlist={result['watchlist'].get('name', '')} "
                 f"count={result.get('requested_count', 0)} "
                 f"events={len(result.get('persisted_events', []))} "
+                f"notification_events={len(result.get('notification_events', []))} "
                 f"min_score={result.get('min_score', '')} "
                 f"errors={len(result.get('errors', []))}"
             )

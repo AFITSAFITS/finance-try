@@ -562,6 +562,7 @@ def main() -> None:
             m2.metric("新增事件数", data.get("count", 0))
             m3.metric("错误数", data.get("error_count", len(data.get("errors", []))))
             m4.metric("耗时(秒)", data.get("elapsed_seconds", ""))
+            st.caption(f"本次代表通知数={data.get('notification_count', len(data.get('deliveries', [])))}")
             for message in data.get("messages", []):
                 st.info(message)
             for error in data.get("errors", []):
