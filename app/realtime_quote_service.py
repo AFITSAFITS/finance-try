@@ -12,6 +12,9 @@ EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/ulist.np/get"
 TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q={symbols}"
 MAX_REASONABLE_PCT_CHANGE = 20.0
 MAX_PCT_CHANGE_DIFF = 0.5
+HOT_PCT_CHANGE = 7.0
+WEAK_PCT_CHANGE = -5.0
+STRONG_VOLUME_RATIO = 1.5
 
 
 def _clean_float(value: object) -> float | None:
@@ -52,6 +55,36 @@ def _enrich_quote_quality(item: dict[str, Any]) -> dict[str, Any]:
     item["quality_status"] = "需确认" if issues else "正常"
     item["quality_note"] = "；".join(issues) if issues else "数据字段完整"
     return item
+
+
+def _enrich_quote_signal(item: dict[str, Any]) -> dict[str, Any]:
+    if item.get("quality_status") != "正常":
+        item["quote_signal"] = "暂不参考"
+        item["quote_note"] = str(item.get("quality_note") or "行情数据需确认")
+        return item
+
+    pct_change = _clean_float(item.get("pct_change"))
+    volume_ratio = _clean_float(item.get("volume_ratio"))
+    if pct_change is None:
+        item["quote_signal"] = "继续观察"
+        item["quote_note"] = "缺少涨跌幅，先看价格和成交额"
+    elif pct_change >= HOT_PCT_CHANGE:
+        item["quote_signal"] = "谨慎追高"
+        item["quote_note"] = "当日涨幅偏高，避免直接追入"
+    elif pct_change <= WEAK_PCT_CHANGE:
+        item["quote_signal"] = "弱势回避"
+        item["quote_note"] = "当日跌幅偏大，先观察承接"
+    elif pct_change > 0 and volume_ratio is not None and volume_ratio >= STRONG_VOLUME_RATIO:
+        item["quote_signal"] = "放量走强"
+        item["quote_note"] = "价格上涨且量能放大"
+    else:
+        item["quote_signal"] = "正常观察"
+        item["quote_note"] = "价格和成交字段正常"
+    return item
+
+
+def _enrich_quote_item(item: dict[str, Any]) -> dict[str, Any]:
+    return _enrich_quote_signal(_enrich_quote_quality(item))
 
 
 def _market_prefix(code: str) -> str:
@@ -114,7 +147,7 @@ def fetch_realtime_quotes_eastmoney(
     by_code: dict[str, dict[str, Any]] = {}
     for row in rows:
         code = tdx_service.format_code(row.get("f12"))
-        by_code[code] = _enrich_quote_quality({
+        by_code[code] = _enrich_quote_item({
             "code": code,
             "name": str(row.get("f14") or ""),
             "latest_price": _clean_float(row.get("f2")),
@@ -171,7 +204,7 @@ def fetch_realtime_quotes_tencent(
         if len(parts) < 38:
             continue
         code = tdx_service.format_code(parts[2])
-        by_code[code] = _enrich_quote_quality({
+        by_code[code] = _enrich_quote_item({
             "code": code,
             "name": parts[1],
             "latest_price": _clean_float(parts[3]),

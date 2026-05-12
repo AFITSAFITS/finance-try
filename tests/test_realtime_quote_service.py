@@ -76,6 +76,7 @@ def test_fetch_realtime_quotes_eastmoney_parses_rows() -> None:
     assert items[0]["latest_price"] == 1354.55
     assert items[0]["pct_change"] == -0.5
     assert items[0]["quality_status"] == "正常"
+    assert items[0]["quote_signal"] == "正常观察"
     assert items[0]["source"] == "eastmoney"
 
 
@@ -103,6 +104,7 @@ def test_fetch_realtime_quotes_tencent_parses_rows() -> None:
     assert items[0]["latest_price"] == 1354.55
     assert items[0]["pct_change"] == -0.5
     assert items[0]["quality_status"] == "正常"
+    assert items[0]["quote_signal"] == "正常观察"
     assert items[0]["source"] == "tencent"
 
 
@@ -121,6 +123,26 @@ def test_quote_quality_marks_suspicious_rows() -> None:
     assert "当前价缺失" in item["quality_note"]
     assert "涨跌幅异常" in item["quality_note"]
     assert "成交量为0" in item["quality_note"]
+
+
+def test_quote_signal_marks_intraday_states() -> None:
+    hot = realtime_quote_service._enrich_quote_signal(
+        {"quality_status": "正常", "pct_change": 8.2, "volume_ratio": 1.1}
+    )
+    weak = realtime_quote_service._enrich_quote_signal(
+        {"quality_status": "正常", "pct_change": -5.5, "volume_ratio": 1.0}
+    )
+    strong = realtime_quote_service._enrich_quote_signal(
+        {"quality_status": "正常", "pct_change": 2.5, "volume_ratio": 1.8}
+    )
+    suspicious = realtime_quote_service._enrich_quote_signal(
+        {"quality_status": "需确认", "quality_note": "当前价缺失"}
+    )
+
+    assert hot["quote_signal"] == "谨慎追高"
+    assert weak["quote_signal"] == "弱势回避"
+    assert strong["quote_signal"] == "放量走强"
+    assert suspicious["quote_signal"] == "暂不参考"
 
 
 def test_fetch_realtime_quotes_best_effort_falls_back_to_tencent(monkeypatch) -> None:

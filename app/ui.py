@@ -208,6 +208,8 @@ def main() -> None:
                     "amount",
                     "quality_status",
                     "quality_note",
+                    "quote_signal",
+                    "quote_note",
                     "source",
                 ]
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "realtime_quotes.csv")
