@@ -80,6 +80,43 @@ def test_fetch_realtime_quotes_eastmoney_parses_rows() -> None:
     assert items[0]["source"] == "eastmoney"
 
 
+def test_fetch_realtime_quotes_eastmoney_batches_large_inputs() -> None:
+    requested_secids: list[str] = []
+
+    def fake_requester(url: str, params: dict[str, str], timeout: float, headers: dict[str, str]):
+        requested_secids.append(params["secids"])
+        rows = []
+        for secid in params["secids"].split(","):
+            code = secid.split(".")[1]
+            rows.append(
+                {
+                    "f12": code,
+                    "f14": f"股票{code}",
+                    "f2": 10.0,
+                    "f3": 0.0,
+                    "f4": 0.0,
+                    "f5": 100,
+                    "f6": 1000,
+                    "f15": 10.1,
+                    "f16": 9.9,
+                    "f17": 10.0,
+                    "f18": 10.0,
+                    "f8": 1.0,
+                    "f10": 1.0,
+                }
+            )
+        return _JsonResponse({"data": {"diff": rows}})
+
+    items = realtime_quote_service.fetch_realtime_quotes_eastmoney(
+        ["600001", "600002", "600003"],
+        requester=fake_requester,
+        batch_size=2,
+    )
+
+    assert requested_secids == ["1.600001,1.600002", "1.600003"]
+    assert [item["code"] for item in items] == ["600001", "600002", "600003"]
+
+
 def test_fetch_realtime_quotes_tencent_parses_rows() -> None:
     text = (
         'v_sh600519="1~贵州茅台~600519~1354.55~1361.33~1362.00~50837~0~0~'
@@ -106,6 +143,35 @@ def test_fetch_realtime_quotes_tencent_parses_rows() -> None:
     assert items[0]["quality_status"] == "正常"
     assert items[0]["quote_signal"] == "正常观察"
     assert items[0]["source"] == "tencent"
+
+
+def test_fetch_realtime_quotes_tencent_batches_large_inputs() -> None:
+    requested_urls: list[str] = []
+
+    def fake_requester(url: str, timeout: float, headers: dict[str, str]):
+        requested_urls.append(url)
+        records = []
+        for symbol in url.split("q=", 1)[1].split(","):
+            code = symbol[-6:]
+            records.append(
+                f'v_{symbol}="1~股票{code}~{code}~10.00~10.00~10.00~100~0~0~'
+                '0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~0~~20260512161416~'
+                '0.00~0.00~10.10~9.90~10.00/100/1000~100~1000~1.00~20.51~~'
+                '10.10~9.90~0.96~100~100~6.26~11~9~1.00~35";'
+            )
+        return _TextResponse("".join(records))
+
+    items = realtime_quote_service.fetch_realtime_quotes_tencent(
+        ["600001", "600002", "600003"],
+        requester=fake_requester,
+        batch_size=2,
+    )
+
+    assert requested_urls == [
+        "https://qt.gtimg.cn/q=sh600001,sh600002",
+        "https://qt.gtimg.cn/q=sh600003",
+    ]
+    assert [item["code"] for item in items] == ["600001", "600002", "600003"]
 
 
 def test_quote_quality_marks_suspicious_rows() -> None:
