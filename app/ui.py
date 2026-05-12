@@ -97,8 +97,28 @@ def main() -> None:
             "- 再打开本页面: `streamlit run app/ui.py`\n"
             "- 本页面调用 `/api/tdx/flow-rank`、`/api/signals/daily`、`/api/watchlists/default`、`/api/signals/scan-default`、`/api/signals/events` 与 `/api/thsdk/klines`。"
         )
-    flow_tab, signal_tab, alerts_tab, history_tab, review_tab, watchlist_tab, kline_tab = st.tabs(
-        ["主力净流入", "日线信号扫描", "今日提醒", "历史事件", "复盘统计", "股票池", "THSDK K线"]
+    (
+        flow_tab,
+        signal_tab,
+        limit_up_tab,
+        sector_tab,
+        alerts_tab,
+        history_tab,
+        review_tab,
+        watchlist_tab,
+        kline_tab,
+    ) = st.tabs(
+        [
+            "主力净流入",
+            "日线信号扫描",
+            "涨停突破",
+            "板块轮动",
+            "今日提醒",
+            "历史事件",
+            "复盘统计",
+            "股票池",
+            "THSDK K线",
+        ]
     )
 
     with flow_tab:
@@ -214,6 +234,140 @@ def main() -> None:
                 df = df[cols]
 
             show_downloadable_table(df, "daily_signal_alerts.csv")
+
+    with limit_up_tab:
+        st.caption("扫描每日涨停池，按近期突破、均线状态、连板和封板稳定性筛出候选，并保存到本地库。")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        limit_trade_date = c1.date_input("交易日", value=pd.Timestamp.now().date(), key="limit_trade_date")
+        limit_lookback = int(c2.number_input("回看天数", min_value=30, max_value=1000, value=120, step=10, key="limit_lookback"))
+        limit_min_score = float(c3.number_input("最低评分", min_value=0.0, max_value=100.0, value=50.0, step=5.0, key="limit_min_score"))
+        limit_max_items = int(c4.number_input("最多保存", min_value=1, max_value=500, value=100, step=10, key="limit_max_items"))
+        limit_pool_limit = int(c5.number_input("最多分析涨停股", min_value=1, max_value=1000, value=200, step=20, key="limit_pool_limit"))
+
+        if st.button("扫描并保存涨停突破", type="primary"):
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/limit-up/breakthroughs",
+                    payload={
+                        "trade_date": str(limit_trade_date),
+                        "lookback_days": limit_lookback,
+                        "min_score": limit_min_score,
+                        "max_items": limit_max_items,
+                        "pool_limit": limit_pool_limit,
+                    },
+                    timeout_seconds=900,
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"扫描失败: {exc}")
+                st.stop()
+
+            st.caption(f"as_of={data.get('as_of', '')} | trade_date={data.get('trade_date', '')} | count={data.get('count', 0)}")
+            for error in data.get("errors", []):
+                st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
+            df = pd.DataFrame(data.get("items", []))
+            if df.empty:
+                st.warning("当前条件下没有筛出涨停突破候选。")
+            else:
+                cols = [
+                    "trade_date",
+                    "code",
+                    "name",
+                    "sector",
+                    "close_price",
+                    "pct_change",
+                    "turnover_rate",
+                    "consecutive_boards",
+                    "score",
+                    "reason",
+                ]
+                show_downloadable_table(df[[c for c in cols if c in df.columns]], "limit_up_breakthroughs.csv")
+
+        if st.button("加载已保存涨停突破"):
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/limit-up/breakthroughs",
+                    method="GET",
+                    params={"trade_date": str(limit_trade_date), "limit": limit_max_items},
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"加载失败: {exc}")
+                st.stop()
+
+            df = pd.DataFrame(data.get("items", []))
+            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            if df.empty:
+                st.warning("没有已保存的涨停突破候选。")
+            else:
+                cols = ["trade_date", "code", "name", "sector", "close_price", "pct_change", "score", "reason", "created_at"]
+                show_downloadable_table(df[[c for c in cols if c in df.columns]], "limit_up_breakthrough_history.csv")
+
+    with sector_tab:
+        st.caption("扫描行业或概念板块，优先找近期活跃、但仍处于相对低位的板块。")
+        c1, c2, c3, c4 = st.columns(4)
+        sector_trade_date = c1.date_input("交易日", value=pd.Timestamp.now().date(), key="sector_trade_date")
+        sector_type = c2.selectbox("板块类型", options=["industry", "concept"], format_func=lambda x: "行业" if x == "industry" else "概念")
+        sector_top_n = int(c3.number_input("扫描前 N 个活跃板块", min_value=1, max_value=200, value=30, step=5, key="sector_top_n"))
+        sector_max_items = int(c4.number_input("最多保存", min_value=1, max_value=100, value=20, step=5, key="sector_max_items"))
+
+        if st.button("扫描并保存板块轮动", type="primary"):
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/sectors/rotation",
+                    payload={
+                        "trade_date": str(sector_trade_date),
+                        "sector_type": sector_type,
+                        "top_n": sector_top_n,
+                        "max_items": sector_max_items,
+                    },
+                    timeout_seconds=900,
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"扫描失败: {exc}")
+                st.stop()
+
+            st.caption(f"as_of={data.get('as_of', '')} | trade_date={data.get('trade_date', '')} | count={data.get('count', 0)}")
+            for error in data.get("errors", []):
+                st.warning(f"{error.get('板块', '')}: {error.get('error', '')}")
+            df = pd.DataFrame(data.get("items", []))
+            if df.empty:
+                st.warning("当前条件下没有生成板块轮动快照。")
+            else:
+                cols = [
+                    "trade_date",
+                    "sector_type",
+                    "sector_name",
+                    "latest_pct_change",
+                    "return_5d",
+                    "return_10d",
+                    "position_60d",
+                    "activity_score",
+                    "rotation_score",
+                    "signal",
+                ]
+                show_downloadable_table(df[[c for c in cols if c in df.columns]], "sector_rotation.csv")
+
+        if st.button("加载已保存板块轮动"):
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/sectors/rotation",
+                    method="GET",
+                    params={"trade_date": str(sector_trade_date), "sector_type": sector_type, "limit": sector_max_items},
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"加载失败: {exc}")
+                st.stop()
+
+            df = pd.DataFrame(data.get("items", []))
+            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            if df.empty:
+                st.warning("没有已保存的板块轮动快照。")
+            else:
+                cols = ["trade_date", "sector_name", "latest_pct_change", "return_5d", "position_60d", "rotation_score", "signal", "created_at"]
+                show_downloadable_table(df[[c for c in cols if c in df.columns]], "sector_rotation_history.csv")
 
     with alerts_tab:
         st.caption("执行每日任务后，新的信号事件会写入 SQLite，并按通知渠道去重，便于后续自动化调度。")

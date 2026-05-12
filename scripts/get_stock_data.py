@@ -19,6 +19,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from app import limit_up_service
+from app import sector_rotation_service
 from app import signal_service
 
 
@@ -252,6 +254,21 @@ def parse_args() -> argparse.Namespace:
     )
     p_signal.add_argument("--output", type=str, default="")
 
+    p_limit = sub.add_parser("limit-up-breakthroughs", help="Scan and save daily limit-up breakthrough candidates.")
+    p_limit.add_argument("--trade-date", type=str, default="", help="YYYY-MM-DD or YYYYMMDD; default today")
+    p_limit.add_argument("--lookback-days", type=int, default=120)
+    p_limit.add_argument("--min-score", type=float, default=50)
+    p_limit.add_argument("--max-items", type=int, default=100)
+    p_limit.add_argument("--pool-limit", type=int, default=200)
+    p_limit.add_argument("--output", type=str, default="")
+
+    p_sector = sub.add_parser("sector-rotation", help="Scan and save active low-position sectors.")
+    p_sector.add_argument("--trade-date", type=str, default="", help="YYYY-MM-DD or YYYYMMDD; default today")
+    p_sector.add_argument("--sector-type", type=str, default="industry", choices=["industry", "concept"])
+    p_sector.add_argument("--top-n", type=int, default=30)
+    p_sector.add_argument("--max-items", type=int, default=20)
+    p_sector.add_argument("--output", type=str, default="")
+
     return parser.parse_args()
 
 
@@ -333,6 +350,65 @@ def main() -> int:
             selected_cols = [col for col in cols if col in df.columns]
             selected_df = df[selected_cols] if selected_cols else df
             print_df(selected_df, args.output or None)
+            return 0
+
+        if args.cmd == "limit-up-breakthroughs":
+            result = limit_up_service.scan_and_save_limit_up_breakthroughs(
+                trade_date=args.trade_date or None,
+                lookback_days=int(args.lookback_days),
+                min_score=float(args.min_score),
+                max_items=int(args.max_items),
+                pool_limit=int(args.pool_limit),
+            )
+            for error in result["errors"]:
+                print(
+                    f"WARNING [{error.get('股票代码', '')}]: {error.get('error', '')}",
+                    file=sys.stderr,
+                )
+            df = pd.DataFrame(result["items"])
+            cols = [
+                "trade_date",
+                "code",
+                "name",
+                "sector",
+                "close_price",
+                "pct_change",
+                "turnover_rate",
+                "consecutive_boards",
+                "score",
+                "reason",
+            ]
+            selected_cols = [col for col in cols if col in df.columns]
+            print_df(df[selected_cols] if selected_cols else df, args.output or None)
+            return 0
+
+        if args.cmd == "sector-rotation":
+            result = sector_rotation_service.scan_and_save_sector_rotation(
+                trade_date=args.trade_date or None,
+                sector_type=args.sector_type,
+                top_n=int(args.top_n),
+                max_items=int(args.max_items),
+            )
+            for error in result["errors"]:
+                print(
+                    f"WARNING [{error.get('板块', '')}]: {error.get('error', '')}",
+                    file=sys.stderr,
+                )
+            df = pd.DataFrame(result["items"])
+            cols = [
+                "trade_date",
+                "sector_type",
+                "sector_name",
+                "latest_pct_change",
+                "return_5d",
+                "return_10d",
+                "position_60d",
+                "activity_score",
+                "rotation_score",
+                "signal",
+            ]
+            selected_cols = [col for col in cols if col in df.columns]
+            print_df(df[selected_cols] if selected_cols else df, args.output or None)
             return 0
     except RuntimeError as exc:
         print(f"ERROR: {exc}")

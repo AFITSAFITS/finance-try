@@ -7,9 +7,11 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app import event_service
+from app import limit_up_service
 from app import notification_service
 from app import review_service
 from app import scan_workflow
+from app import sector_rotation_service
 from app import signal_service
 from app import thsdk_service
 from app import tdx_service
@@ -75,6 +77,21 @@ class BackfillReviewsRequest(BaseModel):
     code: str = ""
     horizons: list[int] = Field(default_factory=lambda: [1, 3, 5])
     adjust: str = "qfq"
+
+
+class LimitUpBreakthroughRequest(BaseModel):
+    trade_date: str = ""
+    lookback_days: int = Field(default=120, ge=30, le=1000)
+    min_score: float = Field(default=50, ge=0, le=100)
+    max_items: int = Field(default=100, ge=1, le=500)
+    pool_limit: int = Field(default=200, ge=1, le=1000)
+
+
+class SectorRotationRequest(BaseModel):
+    trade_date: str = ""
+    sector_type: str = "industry"
+    top_n: int = Field(default=30, ge=1, le=200)
+    max_items: int = Field(default=20, ge=1, le=100)
 
 
 def merge_codes(codes: list[str], codes_text: str) -> list[str]:
@@ -413,6 +430,97 @@ def api_review_snapshots(
             trade_date=trade_date.strip() if trade_date else None,
             code=code.strip() if code else None,
             horizon=horizon.strip() if horizon else None,
+            limit=int(limit),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/limit-up/breakthroughs")
+def api_scan_limit_up_breakthroughs(req: LimitUpBreakthroughRequest) -> dict[str, Any]:
+    try:
+        result = limit_up_service.scan_and_save_limit_up_breakthroughs(
+            trade_date=req.trade_date.strip() or None,
+            lookback_days=int(req.lookback_days),
+            min_score=float(req.min_score),
+            max_items=int(req.max_items),
+            pool_limit=int(req.pool_limit),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "trade_date": result["trade_date"],
+            "count": result["count"],
+            "items": result["items"],
+            "errors": result["errors"],
+            "source": "akshare",
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/limit-up/breakthroughs")
+def api_list_limit_up_breakthroughs(
+    trade_date: str | None = None,
+    code: str | None = None,
+    limit: int = Query(default=200, ge=1, le=500),
+) -> dict[str, Any]:
+    try:
+        items = limit_up_service.list_limit_up_candidates(
+            trade_date=trade_date.strip() if trade_date else None,
+            code=code.strip() if code else None,
+            limit=int(limit),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/sectors/rotation")
+def api_scan_sector_rotation(req: SectorRotationRequest) -> dict[str, Any]:
+    try:
+        result = sector_rotation_service.scan_and_save_sector_rotation(
+            trade_date=req.trade_date.strip() or None,
+            sector_type=req.sector_type.strip().lower(),
+            top_n=int(req.top_n),
+            max_items=int(req.max_items),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "trade_date": result["trade_date"],
+            "count": result["count"],
+            "items": result["items"],
+            "errors": result["errors"],
+            "source": "akshare",
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/sectors/rotation")
+def api_list_sector_rotation(
+    trade_date: str | None = None,
+    sector_type: str | None = None,
+    signal: str | None = None,
+    limit: int = Query(default=200, ge=1, le=500),
+) -> dict[str, Any]:
+    try:
+        items = sector_rotation_service.list_sector_rotation_snapshots(
+            trade_date=trade_date.strip() if trade_date else None,
+            sector_type=sector_type.strip() if sector_type else None,
+            signal=signal.strip() if signal else None,
             limit=int(limit),
         )
         return {

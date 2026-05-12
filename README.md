@@ -24,6 +24,14 @@
   - `MA5上穿MA20`
   - `MA5下穿MA20`
   - `水下金叉后水上再次金叉`
+- 涨停突破候选
+  - 读取每日涨停池
+  - 结合近期高点、均线、连板、封板稳定性评分
+  - 按交易日保存候选股票
+- 板块轮动监控
+  - 支持行业板块与概念板块
+  - 结合近期活跃度和 60 日位置打分
+  - 标记 `活跃低位`、`活跃偏高`、`低位观察`、`普通观察`
 - 默认股票池
   - 支持手工维护
   - 支持一键导入 `沪深300` 成分股
@@ -31,6 +39,8 @@
   - 扫描结果写入 `signal_events`
   - 通知结果写入 `notification_deliveries`
   - 复盘结果写入 `review_snapshots`
+  - 涨停突破写入 `limit_up_candidates`
+  - 板块轮动写入 `sector_rotation_snapshots`
 - 页面与接口
   - FastAPI API
   - Streamlit 页面
@@ -64,6 +74,8 @@ app/
   notification_service.py 通知发送与去重
   worker_service.py       定时任务调度
   review_service.py       复盘回填与统计
+  limit_up_service.py     涨停突破候选扫描与保存
+  sector_rotation_service.py 板块轮动扫描与保存
   db.py                   SQLite 初始化
 scripts/
   get_stock_data.py       CLI 查询入口
@@ -170,6 +182,20 @@ python scripts/review_signal_outcomes.py
 python scripts/review_signal_outcomes.py --trade-date 2026-04-08 --summary-horizon T+3
 ```
 
+### 涨停突破候选
+
+```bash
+python scripts/get_stock_data.py limit-up-breakthroughs --trade-date 2026-05-12
+python scripts/get_stock_data.py limit-up-breakthroughs --min-score 60 --max-items 50 --pool-limit 200
+```
+
+### 板块轮动
+
+```bash
+python scripts/get_stock_data.py sector-rotation --sector-type industry
+python scripts/get_stock_data.py sector-rotation --sector-type concept --top-n 50 --max-items 20
+```
+
 ## API 用法
 
 ### 导入沪深300默认股票池
@@ -228,6 +254,33 @@ curl -X POST http://127.0.0.1:8000/api/signals/scan-default \
   }'
 ```
 
+### 扫描并保存涨停突破候选
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/limit-up/breakthroughs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "trade_date": "2026-05-12",
+    "lookback_days": 120,
+    "min_score": 50,
+    "max_items": 100,
+    "pool_limit": 200
+  }'
+```
+
+### 扫描并保存板块轮动
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/sectors/rotation \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "trade_date": "2026-05-12",
+    "sector_type": "industry",
+    "top_n": 30,
+    "max_items": 20
+  }'
+```
+
 ## 页面用法
 
 页面入口：
@@ -240,6 +293,10 @@ streamlit run app/ui.py
 
 - `日线信号扫描`
   支持批量输入股票，支持勾选“仅保留水下金叉后水上再次金叉”
+- `涨停突破`
+  扫描每日涨停池，保存高评分突破候选，也可以查看历史候选
+- `板块轮动`
+  扫描行业或概念板块，保存活跃低位板块快照
 - `今日提醒`
   对默认股票池执行正式扫描并写入事件库，也可以直接选择通知渠道
 - `历史事件`
@@ -257,6 +314,7 @@ streamlit run app/ui.py
 - 页面能区分“没有命中信号”和“行情源连接失败”
 - 默认股票池与事件库持久化到 SQLite
 - 支持把扫描结果转成事件与复盘快照
+- 支持把涨停突破候选和板块轮动快照按交易日保存
 - 支持 CLI、API、UI 三种入口
 
 ## 部署
@@ -332,6 +390,7 @@ python scripts/run_scan_worker.py --run-once --channel feishu_webhook
 当前项目已经具备部署入口，但要达到稳定生产使用，还需要正视下面几个事实：
 
 - 日线行情当前仍然依赖公网数据源，远端偶发断连时会影响扫描成功率
+- 涨停池和板块数据同样依赖公网数据源，结果适合做候选和观察，不等同于交易建议
 - SQLite 适合单机部署，不适合高并发多实例写入
 - 飞书通知依赖你自己提供有效 webhook；如果地址或签名不对，消息不会发出去
 - 通达信 `TdxQuant` 仍然依赖本地客户端环境，不适合纯容器化部署
@@ -360,6 +419,8 @@ python -m py_compile app/*.py scripts/get_stock_data.py scripts/run_daily_scan.p
 - 事件入库去重单测
 - 飞书通知发送与重试单测
 - worker 定时执行与命令入口单测
+- 涨停突破候选扫描与保存单测
+- 板块轮动扫描与保存单测
 
 如果你要继续往“可部署、可运维”推进，下一步应该补的是：
 

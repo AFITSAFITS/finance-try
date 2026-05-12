@@ -447,3 +447,61 @@ def test_review_stats_api(monkeypatch) -> None:
     body = resp.json()
     assert body["count"] == 1
     assert body["items"][0]["summary"] == "MACD金叉"
+
+
+def test_limit_up_breakthrough_api(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+
+    def fake_scan_and_save_limit_up_breakthroughs(**kwargs):
+        assert kwargs["trade_date"] == "2026-05-12"
+        assert kwargs["min_score"] == 50
+        return {
+            "trade_date": "2026-05-12",
+            "count": 1,
+            "items": [{"code": "600001", "score": 88, "reason": "突破近60日收盘高点"}],
+            "errors": [],
+        }
+
+    monkeypatch.setattr(
+        api_module.limit_up_service,
+        "scan_and_save_limit_up_breakthroughs",
+        fake_scan_and_save_limit_up_breakthroughs,
+    )
+
+    resp = client.post(
+        "/api/limit-up/breakthroughs",
+        json={"trade_date": "2026-05-12", "min_score": 50},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["items"][0]["code"] == "600001"
+
+
+def test_sector_rotation_api(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+
+    def fake_scan_and_save_sector_rotation(**kwargs):
+        assert kwargs["trade_date"] == "2026-05-12"
+        assert kwargs["sector_type"] == "industry"
+        return {
+            "trade_date": "2026-05-12",
+            "count": 1,
+            "items": [{"sector_name": "软件服务", "signal": "活跃低位"}],
+            "errors": [],
+        }
+
+    monkeypatch.setattr(
+        api_module.sector_rotation_service,
+        "scan_and_save_sector_rotation",
+        fake_scan_and_save_sector_rotation,
+    )
+
+    resp = client.post(
+        "/api/sectors/rotation",
+        json={"trade_date": "2026-05-12", "sector_type": "industry"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["items"][0]["signal"] == "活跃低位"

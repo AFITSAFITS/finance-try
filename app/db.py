@@ -97,6 +97,50 @@ CREATE TABLE IF NOT EXISTS review_snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_review_snapshots_horizon ON review_snapshots(horizon);
+
+CREATE TABLE IF NOT EXISTS limit_up_candidates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trade_date TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL DEFAULT '',
+    sector TEXT NOT NULL DEFAULT '',
+    close_price REAL,
+    pct_change REAL,
+    turnover_rate REAL,
+    consecutive_boards INTEGER,
+    first_limit_time TEXT NOT NULL DEFAULT '',
+    last_limit_time TEXT NOT NULL DEFAULT '',
+    open_board_count INTEGER,
+    score REAL NOT NULL DEFAULT 0,
+    reason TEXT NOT NULL DEFAULT '',
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (trade_date, code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_limit_up_candidates_trade_date ON limit_up_candidates(trade_date);
+CREATE INDEX IF NOT EXISTS idx_limit_up_candidates_score ON limit_up_candidates(score);
+
+CREATE TABLE IF NOT EXISTS sector_rotation_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trade_date TEXT NOT NULL,
+    sector_type TEXT NOT NULL,
+    sector_name TEXT NOT NULL,
+    latest_close REAL,
+    latest_pct_change REAL,
+    return_5d REAL,
+    return_10d REAL,
+    position_60d REAL,
+    activity_score REAL,
+    rotation_score REAL,
+    signal TEXT NOT NULL DEFAULT '',
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (trade_date, sector_type, sector_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sector_rotation_trade_date ON sector_rotation_snapshots(trade_date);
+CREATE INDEX IF NOT EXISTS idx_sector_rotation_score ON sector_rotation_snapshots(rotation_score);
 """
 
 
