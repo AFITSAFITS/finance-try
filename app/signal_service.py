@@ -37,6 +37,16 @@ SIGNAL_OUTPUT_COLUMNS = [
 ]
 
 
+def _suppress_akshare_progress() -> None:
+    import akshare.stock.stock_zh_a_sina as stock_zh_a_sina
+    import akshare.stock_feature.stock_hist_tx as stock_hist_tx
+
+    silent_tqdm = lambda iterable, *args, **kwargs: iterable
+    for module in (stock_zh_a_sina, stock_hist_tx):
+        if hasattr(module, "get_tqdm"):
+            module.get_tqdm = lambda enable=True, _silent_tqdm=silent_tqdm: _silent_tqdm
+
+
 def format_trade_date(value: object) -> str:
     if isinstance(value, pd.Timestamp):
         return value.strftime("%Y-%m-%d")
@@ -306,6 +316,7 @@ def _fetch_daily_history_tx_provider(
 ) -> pd.DataFrame:
     import akshare as ak
 
+    _suppress_akshare_progress()
     df = ak.stock_zh_a_hist_tx(
         symbol=_to_ak_market_symbol(code),
         start_date=start_date,
@@ -324,6 +335,7 @@ def _fetch_daily_history_sina_provider(
 ) -> pd.DataFrame:
     import akshare as ak
 
+    _suppress_akshare_progress()
     df = ak.stock_zh_a_daily(
         symbol=_to_ak_market_symbol(code),
         start_date=start_date,

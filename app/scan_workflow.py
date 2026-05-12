@@ -14,8 +14,12 @@ def run_default_watchlist_scan(
     adjust: str = "qfq",
     channel: str = "stdout",
     max_workers: int = 8,
+    bootstrap_if_empty: bool = True,
 ) -> dict[str, Any]:
-    watchlist = watchlist_service.get_default_watchlist()
+    if bootstrap_if_empty:
+        watchlist = watchlist_service.ensure_default_watchlist()
+    else:
+        watchlist = watchlist_service.get_default_watchlist()
     codes = [str(item["code"]) for item in watchlist["items"]]
     if not codes:
         raise ValueError("默认股票池为空，请先保存股票代码")
@@ -39,4 +43,7 @@ def run_default_watchlist_scan(
         "persisted_events": persisted_events,
         "delivery_results": delivery_results,
         "errors": errors,
+        "watchlist_source": watchlist.get("source", "existing"),
+        "watchlist_message": watchlist.get("message", ""),
+        "watchlist_warning": watchlist.get("warning", ""),
     }

@@ -394,6 +394,38 @@ def test_import_default_watchlist_index_api(monkeypatch, tmp_path) -> None:
     assert body["index_code"] == "000300"
 
 
+def test_bootstrap_default_watchlist_api(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+
+    def fake_bootstrap_default_watchlist(**kwargs):
+        assert kwargs["index_code"] == "000300"
+        return {
+            "id": 1,
+            "name": "默认股票池",
+            "description": "默认关注股票列表",
+            "is_default": True,
+            "count": 1,
+            "items": [{"code": "600519"}],
+            "updated_at": "2026-04-09 12:00:00",
+            "index_code": "000300",
+            "source": "seed",
+            "message": "指数成分股导入失败，已使用内置种子股票池",
+        }
+
+    monkeypatch.setattr(
+        api_module.watchlist_service,
+        "bootstrap_default_watchlist",
+        fake_bootstrap_default_watchlist,
+    )
+
+    resp = client.post(
+        "/api/watchlists/default/bootstrap",
+        json={"index_code": "000300"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["source"] == "seed"
+
+
 def test_review_backfill_api(monkeypatch) -> None:
     def fake_backfill_review_snapshots(**kwargs):
         assert kwargs["horizons"] == [1, 3, 5]

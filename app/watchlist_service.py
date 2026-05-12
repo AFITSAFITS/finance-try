@@ -8,6 +8,28 @@ from app import market_service
 from app import tdx_service
 
 DEFAULT_WATCHLIST_NAME = "默认股票池"
+DEFAULT_SEED_CODES = [
+    "600519",
+    "000001",
+    "600036",
+    "300750",
+    "601318",
+    "000858",
+    "600900",
+    "601899",
+    "002594",
+    "000333",
+    "600276",
+    "600030",
+    "601012",
+    "601088",
+    "600309",
+    "002415",
+    "300760",
+    "601166",
+    "600887",
+    "002475",
+]
 
 
 def _row_to_item(row: sqlite3.Row) -> dict[str, object]:
@@ -132,3 +154,44 @@ def import_default_watchlist_from_index(
     payload = replace_default_watchlist_items(codes)
     payload["index_code"] = normalized_index_code
     return payload
+
+
+def bootstrap_default_watchlist(
+    index_code: str = "000300",
+    fallback_to_seed: bool = True,
+    constituent_fetcher=market_service.fetch_index_constituent_codes,
+) -> dict[str, object]:
+    normalized_index_code = market_service.normalize_index_code(index_code)
+    try:
+        payload = import_default_watchlist_from_index(
+            index_code=normalized_index_code,
+            constituent_fetcher=constituent_fetcher,
+        )
+        payload["source"] = "index"
+        payload["message"] = f"已导入 {normalized_index_code} 指数成分股"
+        return payload
+    except Exception as exc:  # noqa: BLE001
+        if not fallback_to_seed:
+            raise
+        payload = replace_default_watchlist_items(DEFAULT_SEED_CODES)
+        payload["index_code"] = normalized_index_code
+        payload["source"] = "seed"
+        payload["warning"] = str(exc)
+        payload["message"] = "指数成分股导入失败，已使用内置种子股票池"
+        return payload
+
+
+def ensure_default_watchlist(
+    index_code: str = "000300",
+    fallback_to_seed: bool = True,
+    constituent_fetcher=market_service.fetch_index_constituent_codes,
+) -> dict[str, object]:
+    watchlist = get_default_watchlist()
+    if int(watchlist.get("count", 0)) > 0:
+        watchlist["source"] = "existing"
+        return watchlist
+    return bootstrap_default_watchlist(
+        index_code=index_code,
+        fallback_to_seed=fallback_to_seed,
+        constituent_fetcher=constituent_fetcher,
+    )

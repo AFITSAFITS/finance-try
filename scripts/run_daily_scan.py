@@ -48,9 +48,14 @@ def main() -> int:
     print(
         f"watchlist={watchlist.get('name', '')} "
         f"count={watchlist.get('count', 0)} "
+        f"source={result.get('watchlist_source', 'existing')} "
         f"events={len(result['persisted_events'])} "
         f"deliveries={len(result['delivery_results'])}"
     )
+    if result.get("watchlist_message"):
+        print(result["watchlist_message"])
+    if result.get("watchlist_warning"):
+        print(f"WARNING [watchlist]: {result['watchlist_warning']}", file=sys.stderr)
 
     new_events = select_newly_delivered_events(
         result["persisted_events"],

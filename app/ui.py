@@ -696,7 +696,7 @@ def main() -> None:
             placeholder=DEFAULT_CODES,
         )
 
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         if c1.button("从服务端刷新股票池"):
             st.session_state["watchlist_codes_text"] = current_codes_text
             st.rerun()
@@ -724,6 +724,23 @@ def main() -> None:
 
             st.session_state["watchlist_codes_text"] = "\n".join(str(item.get("code", "")) for item in data.get("items", []))
             st.success(f"已导入沪深300成分股，共 {data.get('count', 0)} 只股票。")
+
+        if c4.button("初始化股票池"):
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/watchlists/default/bootstrap",
+                    payload={"index_code": "000300"},
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"初始化失败: {exc}")
+                st.stop()
+
+            st.session_state["watchlist_codes_text"] = "\n".join(str(item.get("code", "")) for item in data.get("items", []))
+            if data.get("warning"):
+                st.warning(f"{data.get('message', '已初始化默认股票池')}：{data.get('warning')}")
+            else:
+                st.success(f"已初始化默认股票池，共 {data.get('count', 0)} 只股票。")
 
     with kline_tab:
         c1, c2 = st.columns([2, 1])

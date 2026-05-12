@@ -288,6 +288,18 @@ def api_import_default_watchlist(req: ImportIndexWatchlistRequest) -> dict[str, 
         raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
 
 
+@app.post("/api/watchlists/default/bootstrap")
+def api_bootstrap_default_watchlist(req: ImportIndexWatchlistRequest) -> dict[str, Any]:
+    try:
+        return watchlist_service.bootstrap_default_watchlist(
+            index_code=req.index_code.strip(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
 @app.post("/api/signals/scan-default")
 def api_scan_default_signals(req: ScanDefaultSignalsRequest) -> dict[str, Any]:
     try:
@@ -369,6 +381,9 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
                 "id": result["watchlist"].get("id"),
                 "name": result["watchlist"].get("name", ""),
                 "count": result["watchlist"].get("count", 0),
+                "source": result.get("watchlist_source", "existing"),
+                "message": result.get("watchlist_message", ""),
+                "warning": result.get("watchlist_warning", ""),
             },
             "messages": notification_service.build_stdout_messages(
                 select_newly_delivered_events(
