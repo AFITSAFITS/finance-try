@@ -356,6 +356,8 @@ def main() -> int:
                 "turnover_rate",
                 "volume_ratio",
                 "amount",
+                "quality_status",
+                "quality_note",
                 "source",
             ]
             selected_cols = [col for col in cols if col in df.columns]

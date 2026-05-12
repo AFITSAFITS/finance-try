@@ -10,6 +10,8 @@ from app import tdx_service
 
 EASTMONEY_QUOTE_URL = "https://push2.eastmoney.com/api/qt/ulist.np/get"
 TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q={symbols}"
+MAX_REASONABLE_PCT_CHANGE = 20.0
+MAX_PCT_CHANGE_DIFF = 0.5
 
 
 def _clean_float(value: object) -> float | None:
@@ -22,6 +24,34 @@ def _clean_float(value: object) -> float | None:
         return float(raw)
     except ValueError:
         return None
+
+
+def _enrich_quote_quality(item: dict[str, Any]) -> dict[str, Any]:
+    issues: list[str] = []
+    latest_price = _clean_float(item.get("latest_price"))
+    prev_close = _clean_float(item.get("prev_close"))
+    pct_change = _clean_float(item.get("pct_change"))
+    volume = _clean_float(item.get("volume"))
+    amount = _clean_float(item.get("amount"))
+
+    if latest_price is None or latest_price <= 0:
+        issues.append("当前价缺失")
+    if prev_close is None or prev_close <= 0:
+        issues.append("昨收价缺失")
+    if latest_price is not None and prev_close is not None and prev_close > 0 and pct_change is not None:
+        computed_pct = round(((latest_price / prev_close) - 1.0) * 100.0, 4)
+        if abs(computed_pct - pct_change) > MAX_PCT_CHANGE_DIFF:
+            issues.append("涨跌幅与价格不一致")
+    if pct_change is not None and abs(pct_change) > MAX_REASONABLE_PCT_CHANGE:
+        issues.append("涨跌幅异常")
+    if volume is not None and volume <= 0:
+        issues.append("成交量为0")
+    if amount is not None and amount <= 0:
+        issues.append("成交额为0")
+
+    item["quality_status"] = "需确认" if issues else "正常"
+    item["quality_note"] = "；".join(issues) if issues else "数据字段完整"
+    return item
 
 
 def _market_prefix(code: str) -> str:
@@ -84,7 +114,7 @@ def fetch_realtime_quotes_eastmoney(
     by_code: dict[str, dict[str, Any]] = {}
     for row in rows:
         code = tdx_service.format_code(row.get("f12"))
-        by_code[code] = {
+        by_code[code] = _enrich_quote_quality({
             "code": code,
             "name": str(row.get("f14") or ""),
             "latest_price": _clean_float(row.get("f2")),
@@ -99,7 +129,7 @@ def fetch_realtime_quotes_eastmoney(
             "turnover_rate": _clean_float(row.get("f8")),
             "volume_ratio": _clean_float(row.get("f10")),
             "source": "eastmoney",
-        }
+        })
     return [by_code[code] for code in normalized_codes if code in by_code]
 
 
@@ -141,7 +171,7 @@ def fetch_realtime_quotes_tencent(
         if len(parts) < 38:
             continue
         code = tdx_service.format_code(parts[2])
-        by_code[code] = {
+        by_code[code] = _enrich_quote_quality({
             "code": code,
             "name": parts[1],
             "latest_price": _clean_float(parts[3]),
@@ -156,7 +186,7 @@ def fetch_realtime_quotes_tencent(
             "turnover_rate": _clean_float(parts[38]) if len(parts) > 38 else None,
             "volume_ratio": _clean_float(parts[49]) if len(parts) > 49 else None,
             "source": "tencent",
-        }
+        })
     return [by_code[code] for code in normalized_codes if code in by_code]
 
 

@@ -206,6 +206,8 @@ def main() -> None:
                     "turnover_rate",
                     "volume_ratio",
                     "amount",
+                    "quality_status",
+                    "quality_note",
                     "source",
                 ]
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "realtime_quotes.csv")

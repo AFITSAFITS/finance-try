@@ -75,6 +75,7 @@ def test_fetch_realtime_quotes_eastmoney_parses_rows() -> None:
     assert items[0]["name"] == "贵州茅台"
     assert items[0]["latest_price"] == 1354.55
     assert items[0]["pct_change"] == -0.5
+    assert items[0]["quality_status"] == "正常"
     assert items[0]["source"] == "eastmoney"
 
 
@@ -101,7 +102,25 @@ def test_fetch_realtime_quotes_tencent_parses_rows() -> None:
     assert items[0]["name"] == "贵州茅台"
     assert items[0]["latest_price"] == 1354.55
     assert items[0]["pct_change"] == -0.5
+    assert items[0]["quality_status"] == "正常"
     assert items[0]["source"] == "tencent"
+
+
+def test_quote_quality_marks_suspicious_rows() -> None:
+    item = realtime_quote_service._enrich_quote_quality(
+        {
+            "latest_price": 0,
+            "prev_close": 10,
+            "pct_change": 50,
+            "volume": 0,
+            "amount": 0,
+        }
+    )
+
+    assert item["quality_status"] == "需确认"
+    assert "当前价缺失" in item["quality_note"]
+    assert "涨跌幅异常" in item["quality_note"]
+    assert "成交量为0" in item["quality_note"]
 
 
 def test_fetch_realtime_quotes_best_effort_falls_back_to_tencent(monkeypatch) -> None:
