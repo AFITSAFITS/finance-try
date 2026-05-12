@@ -41,11 +41,15 @@ def test_scan_stock_signal_events_detects_latest_crosses() -> None:
     assert up_row["MACD信号"] == "MACD金叉"
     assert up_row["均线信号"] == "MA5上穿MA20"
     assert up_row["信号"] == "MACD金叉, MA5上穿MA20"
+    assert up_row["信号评分"] >= 80
+    assert up_row["信号方向"] == "偏多"
 
     down_row = df[df["股票代码"] == "600002"].iloc[0]
     assert down_row["MACD信号"] == "MACD死叉"
     assert down_row["均线信号"] == "MA5下穿MA20"
     assert down_row["信号"] == "MACD死叉, MA5下穿MA20"
+    assert down_row["信号评分"] <= 30
+    assert down_row["信号方向"] == "偏空"
 
 
 def test_scan_stock_signal_events_collects_fetch_errors() -> None:
@@ -128,6 +132,26 @@ def test_scan_stock_signal_events_filters_secondary_golden_cross_only() -> None:
     assert errors == []
     assert list(df["股票代码"]) == ["600001"]
     assert df.iloc[0]["MACD形态"] == "水下金叉后水上再次金叉"
+    assert df.iloc[0]["信号级别"] == "重点观察"
+
+
+def test_scan_stock_signal_events_filters_by_min_score() -> None:
+    sample_map = {
+        "600001": make_history("600001", [10.0] * 34 + [20.0]),
+        "600002": make_history("600002", [10.0] * 34 + [0.0]),
+    }
+
+    def fake_fetcher(code: str, lookback_days: int = 180, adjust: str = "qfq") -> pd.DataFrame:
+        return sample_map[code].copy()
+
+    df, errors = signal_service.scan_stock_signal_events(
+        codes=["600001", "600002"],
+        fetcher=fake_fetcher,
+        min_score=60,
+    )
+
+    assert errors == []
+    assert list(df["股票代码"]) == ["600001"]
 
 
 class _FakeResponse:

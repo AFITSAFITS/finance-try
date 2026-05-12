@@ -48,6 +48,7 @@ class DailySignalsRequest(BaseModel):
     adjust: str = "qfq"
     max_workers: int = Field(default=8, ge=1, le=32)
     only_secondary_golden_cross: bool = False
+    min_score: float | None = Field(default=None, ge=0, le=100)
 
 
 class DefaultWatchlistRequest(BaseModel):
@@ -247,6 +248,7 @@ def api_daily_signals(req: DailySignalsRequest) -> dict[str, Any]:
             adjust=req.adjust.strip(),
             max_workers=int(req.max_workers),
             only_secondary_golden_cross=bool(req.only_secondary_golden_cross),
+            min_score=req.min_score,
         )
         items = tdx_service.dataframe_to_records(df)
         return {

@@ -154,6 +154,7 @@ def test_daily_signals_success(monkeypatch) -> None:
     def fake_scan_stock_signal_events(**kwargs):
         assert kwargs["codes"] == ["600592", "600487"]
         assert kwargs["only_secondary_golden_cross"] is False
+        assert kwargs["min_score"] == 60
         return (
             pd.DataFrame(
                 [
@@ -161,6 +162,9 @@ def test_daily_signals_success(monkeypatch) -> None:
                         "股票代码": "600592",
                         "日期": "2026-04-08",
                         "收盘": 12.3,
+                        "信号评分": 95,
+                        "信号方向": "偏多",
+                        "信号级别": "重点观察",
                         "MACD信号": "MACD金叉",
                         "MACD形态": "水下金叉后水上再次金叉",
                         "均线信号": "MA5上穿MA20",
@@ -181,6 +185,7 @@ def test_daily_signals_success(monkeypatch) -> None:
         "/api/signals/daily",
         json={
             "codes_text": "600592\n600487",
+            "min_score": 60,
         },
     )
     assert resp.status_code == 200
@@ -191,6 +196,7 @@ def test_daily_signals_success(monkeypatch) -> None:
     assert body["error_count"] == 1
     assert "elapsed_seconds" in body
     assert body["items"][0]["股票代码"] == "600592"
+    assert body["items"][0]["信号评分"] == 95
     assert body["errors"][0]["股票代码"] == "600487"
 
 

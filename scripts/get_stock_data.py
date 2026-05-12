@@ -247,6 +247,7 @@ def parse_args() -> argparse.Namespace:
     p_signal.add_argument("--lookback-days", type=int, default=180, help="Calendar days to fetch")
     p_signal.add_argument("--adjust", type=str, default="qfq", help="qfq / hfq / empty string")
     p_signal.add_argument("--max-workers", type=int, default=8, help="Parallel fetch workers")
+    p_signal.add_argument("--min-score", type=float, default=0, help="Only keep signals with score >= this value")
     p_signal.add_argument(
         "--only-secondary-golden-cross",
         action="store_true",
@@ -340,13 +341,31 @@ def main() -> int:
                 adjust=args.adjust,
                 max_workers=int(args.max_workers),
                 only_secondary_golden_cross=bool(args.only_secondary_golden_cross),
+                min_score=float(args.min_score),
             )
             for error in errors:
                 print(
                     f"WARNING [{error.get('股票代码', '')}]: {error.get('error', '')}",
                     file=sys.stderr,
                 )
-            cols = ["股票代码", "日期", "收盘", "涨跌幅", "MACD信号", "MACD形态", "均线信号", "信号", "DIF", "DEA", "MA5", "MA20"]
+            cols = [
+                "股票代码",
+                "日期",
+                "收盘",
+                "涨跌幅",
+                "信号评分",
+                "信号方向",
+                "信号级别",
+                "评分原因",
+                "MACD信号",
+                "MACD形态",
+                "均线信号",
+                "信号",
+                "DIF",
+                "DEA",
+                "MA5",
+                "MA20",
+            ]
             selected_cols = [col for col in cols if col in df.columns]
             selected_df = df[selected_cols] if selected_cols else df
             print_df(selected_df, args.output or None)

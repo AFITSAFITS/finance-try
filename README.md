@@ -156,7 +156,10 @@ export AI_FINANCE_FEISHU_SECRET='如果启用了签名校验，就填这里'
 ```bash
 python scripts/get_stock_data.py daily-signals --codes 600519,000001,300502
 python scripts/get_stock_data.py daily-signals --codes-file codes.txt --lookback-days 180 --max-workers 8
+python scripts/get_stock_data.py daily-signals --codes-file codes.txt --min-score 60
 ```
+
+扫描结果会带 `信号评分`、`信号方向`、`信号级别` 和 `评分原因`，可以用 `--min-score` 只保留更值得观察的信号。
 
 ### 仅筛选“水下金叉后水上再次金叉”
 
@@ -233,7 +236,8 @@ curl -X POST http://127.0.0.1:8000/api/signals/daily \
     "codes_text": "600519\n000001\n300502",
     "lookback_days": 180,
     "adjust": "qfq",
-    "max_workers": 8
+    "max_workers": 8,
+    "min_score": 60
   }'
 ```
 

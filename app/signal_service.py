@@ -26,6 +26,9 @@ SIGNAL_OUTPUT_COLUMNS = [
     "日期",
     "收盘",
     "涨跌幅",
+    "信号评分",
+    "信号方向",
+    "信号级别",
     "DIF",
     "DEA",
     "MACD信号",
@@ -134,6 +137,72 @@ def detect_macd_secondary_golden_cross_above_zero(enriched_df: pd.DataFrame) -> 
     return False
 
 
+def score_signal_row(row: dict[str, object]) -> dict[str, object]:
+    score = 50.0
+    reasons: list[str] = []
+    direction = "中性"
+
+    macd_signal = str(row.get("MACD信号") or "")
+    ma_signal = str(row.get("均线信号") or "")
+    macd_pattern = str(row.get("MACD形态") or "")
+    pct_change = row.get("涨跌幅")
+
+    if macd_signal == "MACD金叉":
+        score += 20
+        direction = "偏多"
+        reasons.append("MACD金叉")
+    elif macd_signal == "MACD死叉":
+        score -= 20
+        direction = "偏空"
+        reasons.append("MACD死叉")
+
+    if ma_signal == "MA5上穿MA20":
+        score += 20
+        direction = "偏多"
+        reasons.append("均线转强")
+    elif ma_signal == "MA5下穿MA20":
+        score -= 20
+        direction = "偏空"
+        reasons.append("均线转弱")
+
+    if macd_pattern == SECONDARY_GOLDEN_CROSS_PATTERN:
+        score += 20
+        direction = "偏多"
+        reasons.append("水下金叉后水上再次金叉")
+
+    try:
+        pct = float(pct_change)
+    except (TypeError, ValueError):
+        pct = 0.0
+    if direction == "偏多":
+        if pct >= 7:
+            score -= 10
+            reasons.append("当日涨幅偏高")
+        elif 0 <= pct <= 5:
+            score += 5
+            reasons.append("涨幅未明显过热")
+    elif direction == "偏空" and pct <= -5:
+        score -= 5
+        reasons.append("跌幅偏大")
+
+    bounded_score = max(0.0, min(100.0, score))
+    if bounded_score >= 80:
+        level = "重点观察"
+    elif bounded_score >= 60:
+        level = "观察"
+    elif bounded_score <= 30:
+        level = "风险"
+    else:
+        level = "普通"
+
+    return {
+        "信号评分": round(bounded_score, 2),
+        "信号方向": direction,
+        "信号级别": level,
+        "评分原因": "；".join(reasons),
+    }
+
+
 def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, object] | None:
     normalized = normalize_history_df(history_df, code)
     if len(normalized.index) < 2:
@@ -163,7 +232,7 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
     if not signals:
         return None
 
-    return {
+    row = {
         "股票代码": code,
         "日期": format_trade_date(curr_row["日期"]),
         "收盘": round(float(curr_row["收盘"]), 4),
@@ -177,6 +246,8 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
         "均线信号": ma_signal,
         "信号": ", ".join(signals),
     }
+    row.update(score_signal_row(row))
+    return row
 
 
 def fetch_daily_history_eastmoney(
@@ -531,6 +602,7 @@ def scan_stock_signal_events(
     fetcher: Callable[[str, int, str], pd.DataFrame] = fetch_daily_history_akshare,
     max_workers: int = 8,
     only_secondary_golden_cross: bool = False,
+    min_score: float | None = None,
 ) -> tuple[pd.DataFrame, list[dict[str, str]]]:
     normalized_codes = tdx_service.validate_codes(codes)
 
@@ -552,6 +624,9 @@ def scan_stock_signal_events(
             if only_secondary_golden_cross and signal_row:
                 if signal_row.get("MACD形态") != SECONDARY_GOLDEN_CROSS_PATTERN:
                     signal_row = None
+            if min_score is not None and signal_row:
+                if float(signal_row.get("信号评分", 0)) < float(min_score):
+                    signal_row = None
             if signal_row:
                 rows_by_code[fetched_code] = signal_row
             if error:
@@ -563,6 +638,9 @@ def scan_stock_signal_events(
                 fetched_code, signal_row, error = future.result()
                 if only_secondary_golden_cross and signal_row:
                     if signal_row.get("MACD形态") != SECONDARY_GOLDEN_CROSS_PATTERN:
+                        signal_row = None
+                if min_score is not None and signal_row:
+                    if float(signal_row.get("信号评分", 0)) < float(min_score):
                         signal_row = None
                 if signal_row:
                     rows_by_code[fetched_code] = signal_row

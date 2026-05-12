@@ -186,10 +186,11 @@ def main() -> None:
                 for item in watchlist.get("items", [])
             )
             st.rerun()
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         lookback_days = int(c1.number_input("回看天数", min_value=30, max_value=2000, value=180, step=10))
         adjust = c2.selectbox("复权方式", options=["qfq", "hfq", ""], format_func=lambda x: x or "不复权")
         max_workers = int(c3.number_input("并发数", min_value=1, max_value=32, value=8, step=1))
+        min_signal_score = float(c4.number_input("最低评分", min_value=0.0, max_value=100.0, value=0.0, step=5.0))
         only_secondary_golden_cross = st.checkbox("仅保留“水下金叉后水上再次金叉”", value=False)
 
         if st.button("扫描今日新信号", type="primary"):
@@ -199,6 +200,7 @@ def main() -> None:
                 "adjust": adjust,
                 "max_workers": max_workers,
                 "only_secondary_golden_cross": only_secondary_golden_cross,
+                "min_score": min_signal_score,
             }
             try:
                 data = request_api(
@@ -228,7 +230,24 @@ def main() -> None:
                 st.stop()
 
             df = pd.DataFrame(items)
-            preferred_cols = ["股票代码", "日期", "收盘", "涨跌幅", "MACD信号", "MACD形态", "均线信号", "信号", "DIF", "DEA", "MA5", "MA20"]
+            preferred_cols = [
+                "股票代码",
+                "日期",
+                "收盘",
+                "涨跌幅",
+                "信号评分",
+                "信号方向",
+                "信号级别",
+                "评分原因",
+                "MACD信号",
+                "MACD形态",
+                "均线信号",
+                "信号",
+                "DIF",
+                "DEA",
+                "MA5",
+                "MA20",
+            ]
             cols = [c for c in preferred_cols if c in df.columns]
             if cols:
                 df = df[cols]
