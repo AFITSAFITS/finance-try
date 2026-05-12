@@ -189,3 +189,147 @@ def test_fetch_daily_history_akshare_falls_back_when_direct_fetch_fails(monkeypa
 
     assert len(df) == 35
     assert list(df["股票代码"].unique()) == ["600001"]
+
+
+def test_fetch_daily_history_best_effort_falls_back_to_yahoo(monkeypatch) -> None:
+    monkeypatch.setattr(
+        signal_service,
+        "fetch_daily_history_eastmoney",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("eastmoney down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_akshare_provider",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("akshare down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_tx_provider",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("tencent down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_sina_provider",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("sina down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_baostock_provider",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("baostock down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "fetch_daily_history_yahoo",
+        lambda code, start_date, end_date: make_history(code, [10.0, 11.0]),
+    )
+
+    df = signal_service.fetch_daily_history_best_effort(
+        code="600001",
+        start_date="20260401",
+        end_date="20260408",
+        adjust="qfq",
+    )
+
+    assert list(df["收盘"]) == [10.0, 11.0]
+
+
+def test_fetch_daily_history_best_effort_falls_back_to_tencent(monkeypatch) -> None:
+    monkeypatch.setattr(
+        signal_service,
+        "fetch_daily_history_eastmoney",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("eastmoney down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_akshare_provider",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("akshare down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_tx_provider",
+        lambda code, start_date, end_date, adjust: make_history(code, [10.0, 11.0]),
+    )
+
+    df = signal_service.fetch_daily_history_best_effort(
+        code="600001",
+        start_date="20260401",
+        end_date="20260408",
+        adjust="qfq",
+    )
+
+    assert list(df["收盘"]) == [10.0, 11.0]
+
+
+def test_fetch_daily_history_best_effort_falls_back_to_baostock(monkeypatch) -> None:
+    monkeypatch.setattr(
+        signal_service,
+        "fetch_daily_history_eastmoney",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("eastmoney down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_akshare_provider",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("akshare down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_tx_provider",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("tencent down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_sina_provider",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("sina down")),
+    )
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_baostock_provider",
+        lambda code, start_date, end_date, adjust: make_history(code, [10.0, 11.0]),
+    )
+
+    df = signal_service.fetch_daily_history_best_effort(
+        code="600001",
+        start_date="20260401",
+        end_date="20260408",
+        adjust="qfq",
+    )
+
+    assert list(df["收盘"]) == [10.0, 11.0]
+
+
+def test_fetch_daily_history_yahoo_parses_chart_response() -> None:
+    def fake_requester(url: str, params: dict[str, int | str], timeout: float, headers: dict[str, str]):
+        return _FakeResponse(
+            {
+                "chart": {
+                    "result": [
+                        {
+                            "timestamp": [1775520000, 1775606400],
+                            "indicators": {
+                                "quote": [
+                                    {
+                                        "open": [10.0, 10.5],
+                                        "high": [10.2, 11.2],
+                                        "low": [9.8, 10.4],
+                                        "close": [10.0, 11.0],
+                                        "volume": [1000, 1200],
+                                    }
+                                ]
+                            },
+                        }
+                    ]
+                }
+            }
+        )
+
+    df = signal_service.fetch_daily_history_yahoo(
+        code="600001",
+        start_date="2026-04-07",
+        end_date="2026-04-08",
+        requester=fake_requester,
+    )
+
+    assert list(df["股票代码"]) == ["600001", "600001"]
+    assert list(df["收盘"]) == [10.0, 11.0]
+    assert pd.isna(df.iloc[0]["涨跌幅"])
+    assert round(float(df.iloc[1]["涨跌幅"]), 4) == 10.0

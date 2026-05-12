@@ -16,19 +16,14 @@ def fetch_daily_history_range_akshare(
     end_date: str,
     adjust: str = "qfq",
 ) -> pd.DataFrame:
-    import akshare as ak
-
     begin = pd.to_datetime(start_date).strftime("%Y%m%d")
     finish = pd.to_datetime(end_date).strftime("%Y%m%d")
-    df = ak.stock_zh_a_hist(
-        symbol=code,
-        period="daily",
+    return signal_service.fetch_daily_history_best_effort(
+        code=code,
         start_date=begin,
         end_date=finish,
         adjust=adjust,
-        timeout=10,
     )
-    return signal_service.normalize_history_df(df, code)
 
 
 def _to_number(row: pd.Series, column: str) -> float | None:

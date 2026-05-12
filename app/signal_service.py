@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Iterable
 
 import pandas as pd
@@ -253,23 +253,263 @@ def _fetch_daily_history_akshare_provider(
     return normalize_history_df(df, code)
 
 
+def _to_yahoo_symbol(code: str) -> str:
+    formatted_code = tdx_service.format_code(code)
+    suffix = ".SS" if formatted_code.startswith(("6", "9")) else ".SZ"
+    return f"{formatted_code}{suffix}"
+
+
+def _to_ak_market_symbol(code: str) -> str:
+    formatted_code = tdx_service.format_code(code)
+    prefix = "sh" if formatted_code.startswith(("6", "9")) else "sz"
+    return f"{prefix}{formatted_code}"
+
+
+def _to_baostock_symbol(code: str) -> str:
+    formatted_code = tdx_service.format_code(code)
+    prefix = "sh" if formatted_code.startswith(("6", "9")) else "sz"
+    return f"{prefix}.{formatted_code}"
+
+
+def normalize_provider_history_df(df: pd.DataFrame, code: str) -> pd.DataFrame:
+    if df.empty:
+        return df.copy()
+    rename_map = {
+        "date": "日期",
+        "open": "开盘",
+        "close": "收盘",
+        "high": "最高",
+        "low": "最低",
+        "volume": "成交量",
+        "amount": "成交额",
+        "turnover": "换手率",
+        "turn": "换手率",
+        "pctChg": "涨跌幅",
+    }
+    normalized = df.rename(columns={key: value for key, value in rename_map.items() if key in df.columns}).copy()
+    if "日期" not in normalized.columns and normalized.index.name:
+        normalized = normalized.reset_index().rename(columns={normalized.index.name: "日期"})
+    if "日期" not in normalized.columns and not isinstance(normalized.index, pd.RangeIndex):
+        normalized = normalized.reset_index().rename(columns={"index": "日期"})
+    if "股票代码" not in normalized.columns:
+        normalized["股票代码"] = tdx_service.format_code(code)
+    if "涨跌幅" not in normalized.columns and "收盘" in normalized.columns:
+        normalized["涨跌幅"] = pd.to_numeric(normalized["收盘"], errors="coerce").pct_change() * 100
+    return normalize_history_df(normalized, code)
+
+
+def _fetch_daily_history_tx_provider(
+    code: str,
+    start_date: str,
+    end_date: str,
+    adjust: str,
+) -> pd.DataFrame:
+    import akshare as ak
+
+    df = ak.stock_zh_a_hist_tx(
+        symbol=_to_ak_market_symbol(code),
+        start_date=start_date,
+        end_date=end_date,
+        adjust=adjust,
+        timeout=10,
+    )
+    return normalize_provider_history_df(df, code)
+
+
+def _fetch_daily_history_sina_provider(
+    code: str,
+    start_date: str,
+    end_date: str,
+    adjust: str,
+) -> pd.DataFrame:
+    import akshare as ak
+
+    df = ak.stock_zh_a_daily(
+        symbol=_to_ak_market_symbol(code),
+        start_date=start_date,
+        end_date=end_date,
+        adjust=adjust,
+    )
+    return normalize_provider_history_df(df, code)
+
+
+def _fetch_daily_history_baostock_provider(
+    code: str,
+    start_date: str,
+    end_date: str,
+    adjust: str,
+) -> pd.DataFrame:
+    import baostock as bs
+
+    adjust_map = {"qfq": "2", "hfq": "1", "": "3"}
+    lg = bs.login()
+    try:
+        if getattr(lg, "error_code", "0") != "0":
+            raise RuntimeError(getattr(lg, "error_msg", "baostock login failed"))
+        rs = bs.query_history_k_data_plus(
+            _to_baostock_symbol(code),
+            "date,code,open,high,low,close,volume,amount,turn,pctChg",
+            start_date=pd.to_datetime(start_date).strftime("%Y-%m-%d"),
+            end_date=pd.to_datetime(end_date).strftime("%Y-%m-%d"),
+            frequency="d",
+            adjustflag=adjust_map.get(adjust, "2"),
+        )
+        if getattr(rs, "error_code", "0") != "0":
+            raise RuntimeError(getattr(rs, "error_msg", "baostock query failed"))
+
+        rows: list[list[str]] = []
+        while rs.next():
+            rows.append(rs.get_row_data())
+        df = pd.DataFrame(rows, columns=rs.fields)
+        return normalize_provider_history_df(df, code)
+    finally:
+        bs.logout()
+
+
+def fetch_daily_history_yahoo(
+    code: str,
+    start_date: str,
+    end_date: str,
+    timeout: float = 10.0,
+    requester: Callable[..., object] = requests.get,
+) -> pd.DataFrame:
+    formatted_code = tdx_service.format_code(code)
+    start_dt = pd.to_datetime(start_date).to_pydatetime().replace(tzinfo=timezone.utc)
+    end_dt = pd.to_datetime(end_date).to_pydatetime().replace(tzinfo=timezone.utc) + timedelta(days=1)
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{_to_yahoo_symbol(formatted_code)}"
+    params = {
+        "period1": int(start_dt.timestamp()),
+        "period2": int(end_dt.timestamp()),
+        "interval": "1d",
+        "events": "history",
+        "includeAdjustedClose": "true",
+    }
+    response = requester(url, params=params, timeout=timeout, headers=EASTMONEY_HISTORY_HEADERS)
+    raise_for_status = getattr(response, "raise_for_status", None)
+    if callable(raise_for_status):
+        raise_for_status()
+
+    payload = response.json()
+    result = ((payload.get("chart") or {}).get("result") or [None])[0]
+    if not result:
+        return pd.DataFrame()
+
+    timestamps = result.get("timestamp") or []
+    quote = (((result.get("indicators") or {}).get("quote") or [{}])[0]) or {}
+    rows: list[dict[str, object]] = []
+    for idx, ts in enumerate(timestamps):
+        close = (quote.get("close") or [None] * len(timestamps))[idx]
+        if close is None:
+            continue
+        open_price = (quote.get("open") or [None] * len(timestamps))[idx]
+        high = (quote.get("high") or [None] * len(timestamps))[idx]
+        low = (quote.get("low") or [None] * len(timestamps))[idx]
+        volume = (quote.get("volume") or [None] * len(timestamps))[idx]
+        rows.append(
+            {
+                "日期": datetime.fromtimestamp(int(ts), tz=timezone.utc).strftime("%Y-%m-%d"),
+                "股票代码": formatted_code,
+                "开盘": open_price,
+                "收盘": close,
+                "最高": high,
+                "最低": low,
+                "成交量": volume,
+                "成交额": None,
+                "涨跌幅": None,
+                "换手率": None,
+            }
+        )
+
+    normalized = normalize_history_df(pd.DataFrame(rows), formatted_code)
+    if normalized.empty:
+        return normalized
+    normalized["涨跌幅"] = normalized["收盘"].pct_change() * 100
+    return normalized
+
+
+def fetch_daily_history_best_effort(
+    code: str,
+    start_date: str,
+    end_date: str,
+    adjust: str = "qfq",
+) -> pd.DataFrame:
+    errors: list[str] = []
+    providers: list[tuple[str, Callable[[], pd.DataFrame]]] = [
+        (
+            "eastmoney",
+            lambda: fetch_daily_history_eastmoney(
+                code=code,
+                start_date=start_date,
+                end_date=end_date,
+                adjust=adjust,
+            ),
+        ),
+        (
+            "akshare",
+            lambda: _fetch_daily_history_akshare_provider(
+                code=code,
+                start_date=start_date,
+                end_date=end_date,
+                adjust=adjust,
+            ),
+        ),
+        (
+            "tencent",
+            lambda: _fetch_daily_history_tx_provider(
+                code=code,
+                start_date=start_date,
+                end_date=end_date,
+                adjust=adjust,
+            ),
+        ),
+        (
+            "sina",
+            lambda: _fetch_daily_history_sina_provider(
+                code=code,
+                start_date=start_date,
+                end_date=end_date,
+                adjust=adjust,
+            ),
+        ),
+        (
+            "baostock",
+            lambda: _fetch_daily_history_baostock_provider(
+                code=code,
+                start_date=start_date,
+                end_date=end_date,
+                adjust=adjust,
+            ),
+        ),
+        (
+            "yahoo",
+            lambda: fetch_daily_history_yahoo(
+                code=code,
+                start_date=start_date,
+                end_date=end_date,
+            ),
+        ),
+    ]
+
+    for provider_name, provider in providers:
+        try:
+            df = provider()
+            if not df.empty:
+                return df
+            errors.append(f"{provider_name}: empty")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{provider_name}: {exc}")
+    raise RuntimeError("；".join(errors))
+
+
 def fetch_daily_history_akshare(code: str, lookback_days: int = 180, adjust: str = "qfq") -> pd.DataFrame:
     end_date = datetime.now().strftime("%Y%m%d")
     start_date = (datetime.now() - timedelta(days=int(lookback_days))).strftime("%Y%m%d")
-    try:
-        return fetch_daily_history_eastmoney(
-            code=code,
-            start_date=start_date,
-            end_date=end_date,
-            adjust=adjust,
-        )
-    except Exception:  # noqa: BLE001
-        return _fetch_daily_history_akshare_provider(
-            code=code,
-            start_date=start_date,
-            end_date=end_date,
-            adjust=adjust,
-        )
+    return fetch_daily_history_best_effort(
+        code=code,
+        start_date=start_date,
+        end_date=end_date,
+        adjust=adjust,
+    )
 
 
 def scan_stock_signal_events(

@@ -546,48 +546,48 @@ def backfill_limit_up_review_snapshots(
     snapshots: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
 
-    with db.get_connection() as conn:
-        for stock_code, code_candidates in grouped.items():
-            start_date = min(str(item["trade_date"]) for item in code_candidates)
-            try:
-                history_df = fetcher(stock_code, start_date, end_date, adjust)
-                normalized = signal_service.normalize_history_df(history_df, stock_code)
-                if normalized.empty:
+    for stock_code, code_candidates in grouped.items():
+        start_date = min(str(item["trade_date"]) for item in code_candidates)
+        try:
+            history_df = fetcher(stock_code, start_date, end_date, adjust)
+            normalized = signal_service.normalize_history_df(history_df, stock_code)
+            if normalized.empty:
+                continue
+
+            bar_service.upsert_daily_bars(stock_code, normalized, adjust=adjust)
+            indexed = normalized.copy()
+            indexed["日期字符串"] = indexed["日期"].map(signal_service.format_trade_date)
+            date_to_index = {
+                str(row["日期字符串"]): idx
+                for idx, row in indexed.iterrows()
+            }
+
+            for candidate in code_candidates:
+                candidate_date = str(candidate["trade_date"])
+                base_index = date_to_index.get(candidate_date)
+                if base_index is None:
                     continue
 
-                bar_service.upsert_daily_bars(stock_code, normalized, adjust=adjust)
-                indexed = normalized.copy()
-                indexed["日期字符串"] = indexed["日期"].map(signal_service.format_trade_date)
-                date_to_index = {
-                    str(row["日期字符串"]): idx
-                    for idx, row in indexed.iterrows()
-                }
-
-                for candidate in code_candidates:
-                    candidate_date = str(candidate["trade_date"])
-                    base_index = date_to_index.get(candidate_date)
-                    if base_index is None:
+                base_close = (
+                    float(candidate["close_price"])
+                    if candidate.get("close_price") is not None and float(candidate["close_price"]) > 0
+                    else float(indexed.iloc[base_index]["收盘"])
+                )
+                for horizon_days in selected_horizons:
+                    future_index = base_index + int(horizon_days)
+                    if future_index >= len(indexed.index):
+                        continue
+                    future_row = indexed.iloc[future_index]
+                    window = indexed.iloc[base_index + 1 : future_index + 1]
+                    if window.empty:
                         continue
 
-                    base_close = (
-                        float(candidate["close_price"])
-                        if candidate.get("close_price") is not None and float(candidate["close_price"]) > 0
-                        else float(indexed.iloc[base_index]["收盘"])
-                    )
-                    for horizon_days in selected_horizons:
-                        future_index = base_index + int(horizon_days)
-                        if future_index >= len(indexed.index):
-                            continue
-                        future_row = indexed.iloc[future_index]
-                        window = indexed.iloc[base_index + 1 : future_index + 1]
-                        if window.empty:
-                            continue
-
-                        future_close = float(future_row["收盘"])
-                        pct_return = round(((future_close / base_close) - 1.0) * 100.0, 4)
-                        max_drawdown = round((((window["收盘"] / base_close) - 1.0).min()) * 100.0, 4)
-                        label = horizon_label(horizon_days)
-                        now = tdx_service.now_ts()
+                    future_close = float(future_row["收盘"])
+                    pct_return = round(((future_close / base_close) - 1.0) * 100.0, 4)
+                    max_drawdown = round((((window["收盘"] / base_close) - 1.0).min()) * 100.0, 4)
+                    label = horizon_label(horizon_days)
+                    now = tdx_service.now_ts()
+                    with db.get_connection() as conn:
                         conn.execute(
                             """
                             INSERT INTO limit_up_review_snapshots (
@@ -625,10 +625,10 @@ def backfill_limit_up_review_snapshots(
                             """,
                             (int(candidate["id"]), label),
                         ).fetchone()
-                        assert saved is not None
-                        snapshots.append(_row_to_review(saved))
-            except Exception as exc:  # noqa: BLE001
-                errors.append({"股票代码": stock_code, "error": str(exc)})
+                    assert saved is not None
+                    snapshots.append(_row_to_review(saved))
+        except Exception as exc:  # noqa: BLE001
+            errors.append({"股票代码": stock_code, "error": str(exc)})
 
     snapshots.sort(key=lambda item: (item["trade_date"], item["code"], item["horizon"]))
     return {"count": len(snapshots), "items": snapshots, "errors": errors}
