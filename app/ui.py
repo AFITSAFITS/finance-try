@@ -689,6 +689,8 @@ def main() -> None:
             else:
                 preferred_cols = [
                     "score_bucket",
+                    "signal_direction",
+                    "risk_bucket",
                     "summary",
                     "indicator",
                     "event_type",
@@ -696,6 +698,8 @@ def main() -> None:
                     "avg_return",
                     "win_rate",
                     "avg_max_drawdown",
+                    "avg_position_60d",
+                    "avg_volume_ratio",
                     "horizon",
                 ]
                 cols = [c for c in preferred_cols if c in stats_df.columns]

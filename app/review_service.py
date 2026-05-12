@@ -77,6 +77,13 @@ def _score_bucket(value: object) -> str:
     return "80+"
 
 
+def _risk_bucket(value: object) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value or raw_value in {"-", "无明显风险", "None", "nan"}:
+        return "无明显风险"
+    return "有风险提示"
+
+
 def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
     payload = _parse_payload(row)
     return {
@@ -264,13 +271,17 @@ def summarize_review_stats(
 
     df = pd.DataFrame(snapshots)
     df["score_bucket"] = df["signal_score"].map(_score_bucket)
+    df["signal_direction"] = df["signal_direction"].fillna("未知")
+    df["risk_bucket"] = df["risk_note"].map(_risk_bucket)
     grouped = (
-        df.groupby(["score_bucket", "summary", "indicator", "event_type"], dropna=False)
+        df.groupby(["score_bucket", "signal_direction", "risk_bucket", "summary", "indicator", "event_type"], dropna=False)
         .agg(
             sample_count=("pct_return", "count"),
             avg_return=("pct_return", "mean"),
             win_rate=("pct_return", lambda s: float((s > 0).mean())),
             avg_max_drawdown=("max_drawdown", "mean"),
+            avg_position_60d=("position_60d", "mean"),
+            avg_volume_ratio=("volume_ratio", "mean"),
         )
         .reset_index()
     )
@@ -280,6 +291,8 @@ def summarize_review_stats(
         items.append(
             {
                 "score_bucket": row["score_bucket"],
+                "signal_direction": row["signal_direction"],
+                "risk_bucket": row["risk_bucket"],
                 "summary": row["summary"],
                 "indicator": row["indicator"],
                 "event_type": row["event_type"],
@@ -287,8 +300,14 @@ def summarize_review_stats(
                 "avg_return": round(float(row["avg_return"]), 4),
                 "win_rate": round(float(row["win_rate"]), 4),
                 "avg_max_drawdown": round(float(row["avg_max_drawdown"]), 4),
+                "avg_position_60d": round(float(row["avg_position_60d"]), 4)
+                if not pd.isna(row["avg_position_60d"])
+                else None,
+                "avg_volume_ratio": round(float(row["avg_volume_ratio"]), 4)
+                if not pd.isna(row["avg_volume_ratio"])
+                else None,
                 "horizon": horizon,
             }
         )
-    items.sort(key=lambda item: (item["score_bucket"], -item["sample_count"], item["summary"]))
+    items.sort(key=lambda item: (item["score_bucket"], item["signal_direction"], item["risk_bucket"], -item["sample_count"], item["summary"]))
     return items

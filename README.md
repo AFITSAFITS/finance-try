@@ -199,6 +199,8 @@ python scripts/review_signal_outcomes.py --trade-date 2026-04-08 --summary-horiz
 python scripts/review_signal_outcomes.py --target limit-up --trade-date 2026-05-12 --summary-horizon T+3
 ```
 
+日线复盘统计会同时按评分区间、信号方向和风险提示分层，并展示平均 60 日位置和平均量能比，便于判断哪些信号应该继续保留或降权。
+
 ### 涨停突破候选
 
 ```bash

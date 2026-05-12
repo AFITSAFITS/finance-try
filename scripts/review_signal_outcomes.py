@@ -81,9 +81,11 @@ def main() -> int:
         print("\nsummary_stats")
         for item in signal_stats:
             print(
-                f"score_bucket={item['score_bucket']} | {item['summary']} | horizon={item['horizon']} | "
+                f"score_bucket={item['score_bucket']} | direction={item['signal_direction']} | "
+                f"risk={item['risk_bucket']} | {item['summary']} | horizon={item['horizon']} | "
                 f"samples={item['sample_count']} | avg_return={item['avg_return']} | win_rate={item['win_rate']} | "
-                f"avg_max_drawdown={item['avg_max_drawdown']}"
+                f"avg_max_drawdown={item['avg_max_drawdown']} | avg_position_60d={item['avg_position_60d']} | "
+                f"avg_volume_ratio={item['avg_volume_ratio']}"
             )
     elif args.target in {"signals", "both"}:
         print("没有可用的复盘统计结果。")
