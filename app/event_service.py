@@ -45,6 +45,9 @@ def _signal_payload(row: dict[str, object]) -> dict[str, object]:
         "relative_strength": _clean_number(row.get("相对强度")),
         "candlestick_pattern": row.get("K线形态"),
         "candlestick_note": row.get("K线提示"),
+        "stop_loss_price": _clean_number(row.get("参考止损")),
+        "target_price": _clean_number(row.get("参考目标")),
+        "risk_reward_ratio": _clean_number(row.get("风险收益比")),
     }
 
 

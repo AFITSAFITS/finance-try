@@ -45,6 +45,9 @@ SIGNAL_OUTPUT_COLUMNS = [
     "相对强度",
     "K线形态",
     "K线提示",
+    "参考止损",
+    "参考目标",
+    "风险收益比",
     "风险提示",
     "均线信号",
     "信号",
@@ -210,6 +213,67 @@ def extract_candlestick_profile(row: pd.Series) -> dict[str, object]:
     if close_position <= 0.25 and body_pct <= -2:
         return {"K线形态": "弱势收盘", "K线提示": "收盘接近日低"}
     return {"K线形态": "普通K线", "K线提示": ""}
+
+
+def extract_bullish_trade_plan(enriched_df: pd.DataFrame, row: dict[str, object]) -> dict[str, object]:
+    if row.get("信号方向") != "偏多" or enriched_df.empty:
+        return {"参考止损": None, "参考目标": None, "风险收益比": None}
+
+    close_price = row.get("收盘")
+    try:
+        close = float(close_price)
+    except (TypeError, ValueError):
+        close = float("nan")
+    if pd.isna(close) or close <= 0:
+        return {"参考止损": None, "参考目标": None, "风险收益比": None}
+
+    latest = enriched_df.iloc[-1]
+    support_candidates: list[float] = []
+    if not pd.isna(latest.get("MA20")) and float(latest["MA20"]) < close:
+        support_candidates.append(float(latest["MA20"]))
+    if "最低" in enriched_df.columns:
+        recent_low = enriched_df["最低"].tail(10).min()
+        if not pd.isna(recent_low) and float(recent_low) < close:
+            support_candidates.append(float(recent_low))
+
+    support = max(support_candidates) if support_candidates else close * 0.94
+    stop_price = min(support * 0.98, close * 0.98)
+    stop_price = max(stop_price, close * 0.9)
+    if stop_price >= close:
+        stop_price = close * 0.95
+
+    risk = close - stop_price
+    if risk <= 0:
+        return {"参考止损": None, "参考目标": None, "风险收益比": None}
+    target_price = close + risk * 2
+    return {
+        "参考止损": round(stop_price, 4),
+        "参考目标": round(target_price, 4),
+        "风险收益比": 2.0,
+    }
+
+
+def apply_trade_plan_risk(row: dict[str, object]) -> None:
+    if row.get("信号方向") != "偏多":
+        return
+    try:
+        close = float(row.get("收盘"))
+        stop_price = float(row.get("参考止损"))
+    except (TypeError, ValueError):
+        return
+    if close <= 0 or stop_price <= 0 or stop_price >= close:
+        return
+
+    stop_distance_pct = (close - stop_price) / close * 100
+    if stop_distance_pct <= 8:
+        return
+
+    score = max(0.0, float(row.get("信号评分", 0) or 0) - 5)
+    risks = [part for part in str(row.get("风险提示") or "").split("；") if part and part != "无明显风险"]
+    risks.append("止损距离偏大")
+    row["信号评分"] = round(score, 2)
+    row["信号级别"] = _signal_level(score)
+    row["风险提示"] = "；".join(dict.fromkeys(risks)) if risks else "无明显风险"
 
 
 def score_signal_row(row: dict[str, object]) -> dict[str, object]:
@@ -454,6 +518,8 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
     }
     row.update(extract_candlestick_profile(curr_row))
     row.update(score_signal_row(row))
+    row.update(extract_bullish_trade_plan(enriched, row))
+    apply_trade_plan_risk(row)
     return row
 
 

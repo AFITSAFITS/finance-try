@@ -143,6 +143,36 @@ def test_candlestick_profile_adjusts_bullish_signal_score() -> None:
     assert "冲高回落" in upper_shadow_row["风险提示"]
 
 
+def test_extract_bullish_trade_plan_uses_nearby_support() -> None:
+    history_df = make_history("600001", [10.0] * 24 + [12.0])
+    enriched = signal_service.add_indicator_columns(signal_service.normalize_history_df(history_df, "600001"))
+    row = {"收盘": 12.0, "信号方向": "偏多"}
+
+    plan = signal_service.extract_bullish_trade_plan(enriched, row)
+
+    assert plan["参考止损"] is not None
+    assert plan["参考止损"] < 12.0
+    assert plan["参考目标"] > 12.0
+    assert plan["风险收益比"] == 2.0
+
+
+def test_trade_plan_risk_lowers_score_when_stop_is_too_far() -> None:
+    row = {
+        "收盘": 10.0,
+        "信号方向": "偏多",
+        "信号评分": 82,
+        "信号级别": "重点观察",
+        "风险提示": "无明显风险",
+        "参考止损": 9.0,
+    }
+
+    signal_service.apply_trade_plan_risk(row)
+
+    assert row["信号评分"] == 77
+    assert row["信号级别"] == "观察"
+    assert "止损距离偏大" in row["风险提示"]
+
+
 def test_scan_stock_signal_events_collects_fetch_errors() -> None:
     def fake_fetcher(code: str, lookback_days: int = 180, adjust: str = "qfq") -> pd.DataFrame:
         if code == "600002":
@@ -314,6 +344,27 @@ def test_scan_stock_signal_events_outputs_candlestick_profile() -> None:
     assert strong_row["K线形态"] == "强势收盘"
     assert upper_shadow_row["K线形态"] == "长上影线"
     assert "冲高回落" in upper_shadow_row["风险提示"]
+
+
+def test_scan_stock_signal_events_outputs_trade_plan() -> None:
+    sample_map = {
+        "600001": make_ohlc_history("600001", [10.0] * 64 + [12.0], latest_open=11.5, latest_high=12.1, latest_low=11.4),
+    }
+
+    def fake_fetcher(code: str, lookback_days: int = 180, adjust: str = "qfq") -> pd.DataFrame:
+        return sample_map[code].copy()
+
+    df, errors = signal_service.scan_stock_signal_events(
+        codes=["600001"],
+        fetcher=fake_fetcher,
+        max_workers=1,
+    )
+
+    assert errors == []
+    row = df.iloc[0]
+    assert row["参考止损"] < row["收盘"]
+    assert row["参考目标"] > row["收盘"]
+    assert row["风险收益比"] == 2.0
 
 
 class _FakeResponse:

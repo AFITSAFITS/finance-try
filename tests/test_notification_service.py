@@ -58,6 +58,8 @@ def test_build_stdout_messages_formats_events() -> None:
                     "signal_score": 75,
                     "position_60d": 0.42,
                     "volume_ratio": 1.6,
+                    "stop_loss_price": 1450.0,
+                    "target_price": 1690.0,
                     "risk_note": "无明显风险",
                 },
             }
@@ -69,6 +71,8 @@ def test_build_stdout_messages_formats_events() -> None:
     assert "MACD金叉" in messages[0]
     assert "score=75" in messages[0]
     assert "position_60d=0.42" in messages[0]
+    assert "stop_loss=1450.00" in messages[0]
+    assert "target=1690.00" in messages[0]
     assert "risk=无明显风险" in messages[0]
 
 
@@ -102,6 +106,9 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
                 "signal_level": "重点观察",
                 "position_60d": 0.35,
                 "volume_ratio": 1.8,
+                "stop_loss_price": 1450.0,
+                "target_price": 1690.0,
+                "risk_reward_ratio": 2.0,
                 "risk_note": "无明显风险",
             },
         },
@@ -118,6 +125,9 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
     assert "**级别**\n重点观察" in field_text
     assert "**60日位置**\n0.35" in field_text
     assert "**量能比**\n1.80" in field_text
+    assert "**参考止损**\n1450.00" in field_text
+    assert "**参考目标**\n1690.00" in field_text
+    assert "**风险收益比**\n2.00" in field_text
     assert payload["card"]["elements"][2]["text"]["content"] == "**风险提示**\n无明显风险"
     assert payload["timestamp"] == "1710000000"
     assert payload["sign"] == "jWsBkWnzlRKtaP+iZgwraSojMWik4cJR7aysApQZuoA="
