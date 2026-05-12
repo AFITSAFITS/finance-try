@@ -602,3 +602,29 @@ def api_list_sector_rotation(
         }
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/sectors/rotation/trends")
+def api_list_sector_rotation_trends(
+    sector_type: str | None = None,
+    sector_names: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = Query(default=2000, ge=1, le=10000),
+) -> dict[str, Any]:
+    try:
+        names = [item.strip() for item in (sector_names or "").split(",") if item.strip()]
+        items = sector_rotation_service.list_sector_rotation_trends(
+            sector_type=sector_type.strip() if sector_type else None,
+            sector_names=names,
+            start_date=start_date.strip() if start_date else None,
+            end_date=end_date.strip() if end_date else None,
+            limit=int(limit),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc

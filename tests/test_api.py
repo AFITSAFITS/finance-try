@@ -507,6 +507,43 @@ def test_sector_rotation_api(monkeypatch, tmp_path) -> None:
     assert body["items"][0]["signal"] == "活跃低位"
 
 
+def test_sector_rotation_trends_api(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+
+    def fake_list_sector_rotation_trends(**kwargs):
+        assert kwargs["sector_type"] == "industry"
+        assert kwargs["sector_names"] == ["软件服务", "半导体"]
+        assert kwargs["start_date"] == "2026-05-01"
+        assert kwargs["end_date"] == "2026-05-12"
+        return [
+            {
+                "trade_date": "2026-05-12",
+                "sector_name": "软件服务",
+                "rotation_score": 86.0,
+            }
+        ]
+
+    monkeypatch.setattr(
+        api_module.sector_rotation_service,
+        "list_sector_rotation_trends",
+        fake_list_sector_rotation_trends,
+    )
+
+    resp = client.get(
+        "/api/sectors/rotation/trends",
+        params={
+            "sector_type": "industry",
+            "sector_names": "软件服务,半导体",
+            "start_date": "2026-05-01",
+            "end_date": "2026-05-12",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["items"][0]["rotation_score"] == 86.0
+
+
 def test_limit_up_review_backfill_api(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
 

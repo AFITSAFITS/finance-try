@@ -458,6 +458,51 @@ def main() -> None:
                 cols = ["trade_date", "sector_name", "latest_pct_change", "return_5d", "position_60d", "rotation_score", "signal", "created_at"]
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "sector_rotation_history.csv")
 
+        st.divider()
+        st.caption("查看已保存板块的轮动强弱变化，用来判断热点是持续走强、轮动扩散，还是只有单日异动。")
+        c1, c2 = st.columns(2)
+        trend_days = int(c1.number_input("趋势天数", min_value=5, max_value=250, value=60, step=5, key="sector_trend_days"))
+        trend_names = c2.text_input("指定板块（逗号分隔，可选）", value="", key="sector_trend_names")
+
+        if st.button("加载板块轮动趋势"):
+            end_date = pd.Timestamp(sector_trade_date)
+            start_date = end_date - pd.Timedelta(days=trend_days)
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/sectors/rotation/trends",
+                    method="GET",
+                    params={
+                        "sector_type": sector_type,
+                        "sector_names": trend_names.strip(),
+                        "start_date": str(start_date.date()),
+                        "end_date": str(end_date.date()),
+                        "limit": 5000,
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"加载失败: {exc}")
+                st.stop()
+
+            df = pd.DataFrame(data.get("items", []))
+            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            if df.empty:
+                st.warning("没有可展示的板块轮动趋势。请先扫描并保存几个交易日的板块快照。")
+            else:
+                chart_df = (
+                    df.assign(trade_date=pd.to_datetime(df["trade_date"]))
+                    .pivot_table(
+                        index="trade_date",
+                        columns="sector_name",
+                        values="rotation_score",
+                        aggfunc="last",
+                    )
+                    .sort_index()
+                )
+                st.line_chart(chart_df, use_container_width=True)
+                cols = ["trade_date", "sector_name", "rotation_score", "activity_score", "position_60d", "signal", "created_at"]
+                show_downloadable_table(df[[c for c in cols if c in df.columns]], "sector_rotation_trends.csv")
+
     with alerts_tab:
         st.caption("执行每日任务后，新的信号事件会写入 SQLite，并按通知渠道去重，便于后续自动化调度。")
         event_date = st.date_input("交易日", value=pd.Timestamp.now().date(), key="event_date")

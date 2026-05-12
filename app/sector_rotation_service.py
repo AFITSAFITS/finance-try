@@ -50,22 +50,31 @@ def fetch_sector_spot(sector_type: str = "industry") -> pd.DataFrame:
     import akshare as ak
 
     if sector_type == "industry":
-        return ak.stock_board_industry_name_em()
-    if sector_type == "concept":
-        return ak.stock_board_concept_name_em()
-    raise ValueError("sector_type 只能是 industry 或 concept")
+        fetchers = [ak.stock_board_industry_name_em, ak.stock_board_industry_name_ths]
+    elif sector_type == "concept":
+        fetchers = [ak.stock_board_concept_name_em, ak.stock_board_concept_name_ths]
+    else:
+        raise ValueError("sector_type 只能是 industry 或 concept")
+
+    errors: list[str] = []
+    for fetcher in fetchers:
+        try:
+            df = fetcher()
+            if not df.empty:
+                return df
+            errors.append(f"{fetcher.__name__}: empty")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{fetcher.__name__}: {exc}")
+    raise RuntimeError("; ".join(errors) or "板块列表获取失败")
 
 
-def fetch_sector_history(
+def _fetch_sector_history_em(
+    ak: Any,
     sector_name: str,
-    sector_type: str = "industry",
-    start_date: str | None = None,
-    end_date: str | None = None,
+    sector_type: str,
+    start: str,
+    end: str,
 ) -> pd.DataFrame:
-    import akshare as ak
-
-    end = compact_trade_date(end_date)
-    start = start_date or (datetime.strptime(end, "%Y%m%d") - timedelta(days=120)).strftime("%Y%m%d")
     if sector_type == "industry":
         return ak.stock_board_industry_hist_em(
             symbol=sector_name,
@@ -85,9 +94,54 @@ def fetch_sector_history(
     raise ValueError("sector_type 只能是 industry 或 concept")
 
 
+def _fetch_sector_history_ths(
+    ak: Any,
+    sector_name: str,
+    sector_type: str,
+    start: str,
+    end: str,
+) -> pd.DataFrame:
+    if sector_type == "industry":
+        return ak.stock_board_industry_index_ths(
+            symbol=sector_name,
+            start_date=start,
+            end_date=end,
+        )
+    if sector_type == "concept":
+        return ak.stock_board_concept_index_ths(
+            symbol=sector_name,
+            start_date=start,
+            end_date=end,
+        )
+    raise ValueError("sector_type 只能是 industry 或 concept")
+
+
+def fetch_sector_history(
+    sector_name: str,
+    sector_type: str = "industry",
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> pd.DataFrame:
+    import akshare as ak
+
+    end = compact_trade_date(end_date)
+    start = start_date or (datetime.strptime(end, "%Y%m%d") - timedelta(days=120)).strftime("%Y%m%d")
+    fetchers = [_fetch_sector_history_em, _fetch_sector_history_ths]
+    errors: list[str] = []
+    for fetcher in fetchers:
+        try:
+            df = fetcher(ak, sector_name, sector_type, start, end)
+            if not df.empty:
+                return df
+            errors.append(f"{fetcher.__name__}: empty")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{fetcher.__name__}: {exc}")
+    raise RuntimeError("; ".join(errors) or f"{sector_name} 板块历史获取失败")
+
+
 def normalize_sector_spot(df: pd.DataFrame, sector_type: str) -> pd.DataFrame:
-    name_col = _col(df, ["板块名称", "名称", "行业名称", "概念名称"])
-    pct_col = _col(df, ["涨跌幅", "涨跌幅%", "涨幅"])
+    name_col = _col(df, ["板块名称", "名称", "行业名称", "概念名称", "name"])
+    pct_col = _col(df, ["涨跌幅", "涨跌幅%", "涨幅", "change_percent"])
     if name_col is None:
         raise ValueError("板块数据缺少名称字段")
 
@@ -349,6 +403,48 @@ def list_sector_rotation_snapshots(
             FROM sector_rotation_snapshots
             {where_sql}
             ORDER BY trade_date DESC, rotation_score DESC, sector_name ASC
+            LIMIT ?
+            """,
+            tuple(params),
+        ).fetchall()
+    return [_row_to_snapshot(row) for row in rows]
+
+
+def list_sector_rotation_trends(
+    sector_type: str | None = None,
+    sector_names: list[str] | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 2000,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    params: list[object] = []
+    if sector_type:
+        clauses.append("sector_type = ?")
+        params.append(sector_type.strip().lower())
+    names = [name.strip() for name in sector_names or [] if name.strip()]
+    if names:
+        placeholders = ", ".join("?" for _ in names)
+        clauses.append(f"sector_name IN ({placeholders})")
+        params.extend(names)
+    if start_date:
+        clauses.append("trade_date >= ?")
+        params.append(normalize_trade_date(start_date))
+    if end_date:
+        clauses.append("trade_date <= ?")
+        params.append(normalize_trade_date(end_date))
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    params.append(int(limit))
+
+    with db.get_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT id, trade_date, sector_type, sector_name, latest_close, latest_pct_change,
+                   return_5d, return_10d, position_60d, activity_score, rotation_score,
+                   signal, payload_json, created_at
+            FROM sector_rotation_snapshots
+            {where_sql}
+            ORDER BY trade_date ASC, sector_type ASC, sector_name ASC
             LIMIT ?
             """,
             tuple(params),

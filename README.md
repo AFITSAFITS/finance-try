@@ -200,6 +200,8 @@ python scripts/get_stock_data.py sector-rotation --sector-type industry
 python scripts/get_stock_data.py sector-rotation --sector-type concept --top-n 50 --max-items 20
 ```
 
+板块轮动快照保存后，可以在页面里加载趋势图，观察同一批板块的评分变化。
+
 ## API 用法
 
 ### 导入沪深300默认股票池
@@ -301,6 +303,12 @@ curl -X POST http://127.0.0.1:8000/api/sectors/rotation \
     "top_n": 30,
     "max_items": 20
   }'
+```
+
+### 查看板块轮动趋势
+
+```bash
+curl 'http://127.0.0.1:8000/api/sectors/rotation/trends?sector_type=industry&start_date=2026-05-01&end_date=2026-05-12'
 ```
 
 ## 页面用法
