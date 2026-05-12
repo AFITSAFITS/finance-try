@@ -93,3 +93,5 @@ def test_backfill_review_snapshots_and_stats(monkeypatch, tmp_path) -> None:
     assert macd_stats["win_rate"] == 1.0
     assert macd_stats["avg_position_60d"] == 0.92
     assert macd_stats["avg_volume_ratio"] == 1.35
+    assert macd_stats["strategy_verdict"] == "样本不足"
+    assert "继续积累" in macd_stats["strategy_note"]

@@ -410,6 +410,8 @@ def main() -> None:
                     "win_rate",
                     "avg_max_drawdown",
                     "avg_sector_limit_up_count",
+                    "strategy_verdict",
+                    "strategy_note",
                     "horizon",
                 ]
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "limit_up_review_stats.csv")
@@ -700,6 +702,8 @@ def main() -> None:
                     "avg_max_drawdown",
                     "avg_position_60d",
                     "avg_volume_ratio",
+                    "strategy_verdict",
+                    "strategy_note",
                     "horizon",
                 ]
                 cols = [c for c in preferred_cols if c in stats_df.columns]

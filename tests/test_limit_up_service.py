@@ -197,6 +197,8 @@ def test_backfill_limit_up_review_snapshots_and_stats(monkeypatch, tmp_path) -> 
             "win_rate": 1.0,
             "avg_max_drawdown": -10.0,
             "avg_sector_limit_up_count": 4.0,
+            "strategy_verdict": "样本不足",
+            "strategy_note": "样本数少于5，先继续积累",
             "horizon": "T+3",
         }
     ]

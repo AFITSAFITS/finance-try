@@ -85,7 +85,8 @@ def main() -> int:
                 f"risk={item['risk_bucket']} | {item['summary']} | horizon={item['horizon']} | "
                 f"samples={item['sample_count']} | avg_return={item['avg_return']} | win_rate={item['win_rate']} | "
                 f"avg_max_drawdown={item['avg_max_drawdown']} | avg_position_60d={item['avg_position_60d']} | "
-                f"avg_volume_ratio={item['avg_volume_ratio']}"
+                f"avg_volume_ratio={item['avg_volume_ratio']} | verdict={item['strategy_verdict']} | "
+                f"note={item['strategy_note']}"
             )
     elif args.target in {"signals", "both"}:
         print("没有可用的复盘统计结果。")
@@ -101,7 +102,8 @@ def main() -> int:
                 f"score_bucket={item['score_bucket']} | horizon={item['horizon']} | "
                 f"samples={item['sample_count']} | avg_return={item['avg_return']} | "
                 f"win_rate={item['win_rate']} | avg_max_drawdown={item['avg_max_drawdown']} | "
-                f"avg_sector_limit_up_count={item['avg_sector_limit_up_count']}"
+                f"avg_sector_limit_up_count={item['avg_sector_limit_up_count']} | "
+                f"verdict={item['strategy_verdict']} | note={item['strategy_note']}"
             )
     elif args.target in {"limit-up", "both"}:
         print("没有可用的涨停候选复盘统计结果。")

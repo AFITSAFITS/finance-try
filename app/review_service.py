@@ -9,6 +9,7 @@ import pandas as pd
 
 from app import bar_service
 from app import db
+from app import review_decision
 from app import signal_service
 from app import tdx_service
 
@@ -288,6 +289,15 @@ def summarize_review_stats(
 
     items: list[dict[str, Any]] = []
     for _, row in grouped.iterrows():
+        avg_return = round(float(row["avg_return"]), 4)
+        win_rate = round(float(row["win_rate"]), 4)
+        avg_max_drawdown = round(float(row["avg_max_drawdown"]), 4)
+        decision = review_decision.build_review_decision(
+            sample_count=int(row["sample_count"]),
+            avg_return=avg_return,
+            win_rate=win_rate,
+            avg_max_drawdown=avg_max_drawdown,
+        )
         items.append(
             {
                 "score_bucket": row["score_bucket"],
@@ -297,15 +307,17 @@ def summarize_review_stats(
                 "indicator": row["indicator"],
                 "event_type": row["event_type"],
                 "sample_count": int(row["sample_count"]),
-                "avg_return": round(float(row["avg_return"]), 4),
-                "win_rate": round(float(row["win_rate"]), 4),
-                "avg_max_drawdown": round(float(row["avg_max_drawdown"]), 4),
+                "avg_return": avg_return,
+                "win_rate": win_rate,
+                "avg_max_drawdown": avg_max_drawdown,
                 "avg_position_60d": round(float(row["avg_position_60d"]), 4)
                 if not pd.isna(row["avg_position_60d"])
                 else None,
                 "avg_volume_ratio": round(float(row["avg_volume_ratio"]), 4)
                 if not pd.isna(row["avg_volume_ratio"])
                 else None,
+                "strategy_verdict": decision["strategy_verdict"],
+                "strategy_note": decision["strategy_note"],
                 "horizon": horizon,
             }
         )
