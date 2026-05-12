@@ -404,6 +404,14 @@ docker compose up --build -d
 - `ui`
 - `worker`
 
+启动后可以跑一次部署烟测：
+
+```bash
+python scripts/deployment_smoke.py --require-watchlist
+```
+
+这会检查 API 健康状态、默认股票池和页面是否能访问。
+
 ### 停止
 
 ```bash
@@ -452,7 +460,8 @@ python scripts/run_scan_worker.py --run-once --channel feishu_webhook
 ```bash
 source .venv/bin/activate
 pytest -q
-python -m py_compile app/*.py scripts/get_stock_data.py scripts/run_daily_scan.py scripts/run_scan_worker.py scripts/review_signal_outcomes.py
+python -m py_compile app/*.py scripts/get_stock_data.py scripts/run_daily_scan.py scripts/run_scan_worker.py scripts/review_signal_outcomes.py scripts/deployment_smoke.py
+python scripts/deployment_smoke.py --require-watchlist
 ```
 
 ## 当前验证范围
