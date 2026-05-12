@@ -26,10 +26,12 @@ def format_event_message(event: dict[str, Any]) -> str:
     risk_note = _clean_display(payload.get("risk_note"))
     position_60d = _format_number(payload.get("position_60d"))
     volume_ratio = _format_number(payload.get("volume_ratio"))
+    relative_strength = _format_number(payload.get("relative_strength"))
     return (
         f"[{trade_date}] {code} {summary} | severity={severity} | "
         f"close={close_price} | pct_change={pct_change} | score={signal_score} | "
-        f"position_60d={position_60d} | volume_ratio={volume_ratio} | risk={risk_note}"
+        f"position_60d={position_60d} | volume_ratio={volume_ratio} | "
+        f"relative_strength={relative_strength} | risk={risk_note}"
     )
 
 
@@ -82,6 +84,7 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
     risk_note = _clean_display(payload.get("risk_note"))
     position_60d = _format_number(payload.get("position_60d"))
     volume_ratio = _format_number(payload.get("volume_ratio"))
+    relative_strength = _format_number(payload.get("relative_strength"))
 
     card_payload: dict[str, Any] = {
         "msg_type": "interactive",
@@ -116,6 +119,7 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**级别**\n{signal_level}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**60日位置**\n{position_60d}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**量能比**\n{volume_ratio}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**相对强度**\n{relative_strength}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**指标**\n{indicator}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**类型**\n{event_type}"}},
                     ],

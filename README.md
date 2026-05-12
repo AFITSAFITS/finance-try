@@ -165,7 +165,8 @@ python scripts/get_stock_data.py daily-signals --codes-file codes.txt --lookback
 python scripts/get_stock_data.py daily-signals --codes-file codes.txt --min-score 60
 ```
 
-扫描结果会带 `信号评分`、`信号方向`、`信号级别`、`评分原因`、`风险提示`、`60日位置` 和 `量能比`，可以用 `--min-score` 只保留更值得观察的信号。
+扫描结果会带 `信号评分`、`信号方向`、`信号级别`、`评分原因`、`风险提示`、`60日位置`、`量能比`、`20日涨幅`、`60日涨幅` 和 `相对强度`，可以用 `--min-score` 只保留更值得观察的信号。
+`相对强度` 会把股票放在本次扫描的股票池里横向比较，偏强的多头信号会加分，明显偏弱的会降权。
 日线信号入库后会同步保存评分信息，复盘统计会按评分区间汇总，方便观察高分信号后续表现是否更稳定。
 默认会限制单个行情源的最长等待时间，避免某个外部数据源卡住整批扫描。可以用 `AI_FINANCE_PROVIDER_TIMEOUT_SECONDS` 调整，默认 12 秒。
 日线扫描会复用当天已抓取的本地 K 线缓存；缓存不足时才重新请求外部行情源。

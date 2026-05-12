@@ -40,6 +40,9 @@ def _signal_payload(row: dict[str, object]) -> dict[str, object]:
         "risk_note": row.get("风险提示"),
         "position_60d": _clean_number(row.get("60日位置")),
         "volume_ratio": _clean_number(row.get("量能比")),
+        "return_20d": _clean_number(row.get("20日涨幅")),
+        "return_60d": _clean_number(row.get("60日涨幅")),
+        "relative_strength": _clean_number(row.get("相对强度")),
     }
 
 

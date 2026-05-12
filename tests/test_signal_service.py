@@ -190,6 +190,54 @@ def test_scan_stock_signal_events_filters_by_min_score() -> None:
     assert list(df["股票代码"]) == ["600001"]
 
 
+def test_scan_stock_signal_events_adds_relative_strength() -> None:
+    sample_map = {
+        "600001": make_history("600001", [10.0] * 64 + [20.0]),
+        "600002": make_history("600002", [10.0] * 64 + [11.0]),
+        "600003": make_history("600003", [10.0] * 65),
+    }
+
+    def fake_fetcher(code: str, lookback_days: int = 180, adjust: str = "qfq") -> pd.DataFrame:
+        return sample_map[code].copy()
+
+    df, errors = signal_service.scan_stock_signal_events(
+        codes=["600001", "600002", "600003"],
+        fetcher=fake_fetcher,
+        max_workers=1,
+    )
+
+    assert errors == []
+    strong_row = df[df["股票代码"] == "600001"].iloc[0]
+    normal_row = df[df["股票代码"] == "600002"].iloc[0]
+    assert strong_row["60日涨幅"] == 100.0
+    assert strong_row["相对强度"] == 100.0
+    assert "股票池内强势" in strong_row["评分原因"]
+    assert normal_row["20日涨幅"] == 10.0
+    assert normal_row["相对强度"] > 50.0
+
+
+def test_relative_strength_can_filter_weak_pool_signal() -> None:
+    sample_map = {
+        "600001": make_history("600001", [10.0] * 64 + [10.5]),
+        "600002": make_history("600002", [10.0] * 64 + [20.0]),
+        "600003": make_history("600003", [10.0] * 64 + [18.0]),
+        "600004": make_history("600004", [10.0] * 64 + [16.0]),
+    }
+
+    def fake_fetcher(code: str, lookback_days: int = 180, adjust: str = "qfq") -> pd.DataFrame:
+        return sample_map[code].copy()
+
+    df, errors = signal_service.scan_stock_signal_events(
+        codes=["600001", "600002", "600003", "600004"],
+        fetcher=fake_fetcher,
+        min_score=80,
+        max_workers=1,
+    )
+
+    assert errors == []
+    assert "600001" not in set(df["股票代码"])
+
+
 class _FakeResponse:
     def __init__(self, payload: dict[str, object]) -> None:
         self._payload = payload

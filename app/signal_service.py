@@ -31,6 +31,7 @@ SIGNAL_OUTPUT_COLUMNS = [
     "信号评分",
     "信号方向",
     "信号级别",
+    "评分原因",
     "DIF",
     "DEA",
     "MACD信号",
@@ -39,6 +40,9 @@ SIGNAL_OUTPUT_COLUMNS = [
     "MA20",
     "60日位置",
     "量能比",
+    "20日涨幅",
+    "60日涨幅",
+    "相对强度",
     "风险提示",
     "均线信号",
     "信号",
@@ -274,6 +278,90 @@ def score_signal_row(row: dict[str, object]) -> dict[str, object]:
         "评分原因": "；".join(reasons),
         "风险提示": "；".join(risks) if risks else "无明显风险",
     }
+
+
+def _signal_level(score: float) -> str:
+    if score >= 80:
+        return "重点观察"
+    if score >= 60:
+        return "观察"
+    if score <= 30:
+        return "风险"
+    return "普通"
+
+
+def extract_strength_metrics(code: str, history_df: pd.DataFrame) -> dict[str, object] | None:
+    normalized = normalize_history_df(history_df, code)
+    if len(normalized.index) < 21:
+        return None
+
+    latest = normalized.iloc[-1]
+    close = float(latest["收盘"])
+    if close <= 0:
+        return None
+
+    def pct_return(days: int) -> float | None:
+        if len(normalized.index) <= days:
+            return None
+        base = normalized.iloc[-days - 1]["收盘"]
+        if pd.isna(base) or float(base) <= 0:
+            return None
+        return round((close / float(base) - 1) * 100, 4)
+
+    return {
+        "股票代码": code,
+        "20日涨幅": pct_return(20),
+        "60日涨幅": pct_return(60),
+    }
+
+
+def apply_relative_strength(
+    rows_by_code: dict[str, dict[str, object]],
+    metrics_by_code: dict[str, dict[str, object]],
+) -> None:
+    if not rows_by_code or not metrics_by_code:
+        return
+
+    strength_values = {
+        code: metrics["60日涨幅"] if metrics.get("60日涨幅") is not None else metrics.get("20日涨幅")
+        for code, metrics in metrics_by_code.items()
+    }
+    strength_series = pd.Series(strength_values, dtype="float64").dropna()
+    if strength_series.empty:
+        return
+
+    rank_series = strength_series.rank(method="average", pct=True) * 100
+    for code, row in rows_by_code.items():
+        metrics = metrics_by_code.get(code) or {}
+        row["20日涨幅"] = metrics.get("20日涨幅")
+        row["60日涨幅"] = metrics.get("60日涨幅")
+        if code not in rank_series:
+            row["相对强度"] = None
+            continue
+
+        relative_strength = round(float(rank_series[code]), 2)
+        row["相对强度"] = relative_strength
+        if row.get("信号方向") != "偏多":
+            continue
+
+        score = float(row.get("信号评分", 0) or 0)
+        reasons = [part for part in str(row.get("评分原因") or "").split("；") if part]
+        risks = [part for part in str(row.get("风险提示") or "").split("；") if part and part != "无明显风险"]
+        if relative_strength >= 80:
+            score += 8
+            reasons.append("股票池内强势")
+        elif relative_strength >= 60:
+            score += 3
+            reasons.append("股票池内偏强")
+        elif relative_strength < 30:
+            score -= 8
+            risks.append("股票池内偏弱")
+
+        bounded_score = max(0.0, min(100.0, score))
+        row["信号评分"] = round(bounded_score, 2)
+        row["信号级别"] = _signal_level(bounded_score)
+        row["评分原因"] = "；".join(dict.fromkeys(reasons))
+        row["风险提示"] = "；".join(dict.fromkeys(risks)) if risks else "无明显风险"
 
 
 def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, object] | None:
@@ -685,27 +773,28 @@ def scan_stock_signal_events(
 ) -> tuple[pd.DataFrame, list[dict[str, str]]]:
     normalized_codes = tdx_service.validate_codes(codes)
 
-    def run_single(code: str) -> tuple[str, dict[str, object] | None, str | None]:
+    def run_single(code: str) -> tuple[str, dict[str, object] | None, dict[str, object] | None, str | None]:
         try:
             history_df = fetcher(code, int(lookback_days), adjust)
             signal_row = extract_latest_signal_row(code, history_df)
-            return code, signal_row, None
+            strength_metrics = extract_strength_metrics(code, history_df)
+            return code, signal_row, strength_metrics, None
         except Exception as exc:  # noqa: BLE001
-            return code, None, str(exc)
+            return code, None, None, str(exc)
 
     rows_by_code: dict[str, dict[str, object]] = {}
+    metrics_by_code: dict[str, dict[str, object]] = {}
     errors_by_code: dict[str, str] = {}
     worker_count = max(1, min(int(max_workers), len(normalized_codes)))
 
     if worker_count == 1:
         for code in normalized_codes:
-            fetched_code, signal_row, error = run_single(code)
+            fetched_code, signal_row, strength_metrics, error = run_single(code)
             if only_secondary_golden_cross and signal_row:
                 if signal_row.get("MACD形态") != SECONDARY_GOLDEN_CROSS_PATTERN:
                     signal_row = None
-            if min_score is not None and signal_row:
-                if float(signal_row.get("信号评分", 0)) < float(min_score):
-                    signal_row = None
+            if strength_metrics:
+                metrics_by_code[fetched_code] = strength_metrics
             if signal_row:
                 rows_by_code[fetched_code] = signal_row
             if error:
@@ -714,17 +803,24 @@ def scan_stock_signal_events(
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
             future_map = {executor.submit(run_single, code): code for code in normalized_codes}
             for future in as_completed(future_map):
-                fetched_code, signal_row, error = future.result()
+                fetched_code, signal_row, strength_metrics, error = future.result()
                 if only_secondary_golden_cross and signal_row:
                     if signal_row.get("MACD形态") != SECONDARY_GOLDEN_CROSS_PATTERN:
                         signal_row = None
-                if min_score is not None and signal_row:
-                    if float(signal_row.get("信号评分", 0)) < float(min_score):
-                        signal_row = None
+                if strength_metrics:
+                    metrics_by_code[fetched_code] = strength_metrics
                 if signal_row:
                     rows_by_code[fetched_code] = signal_row
                 if error:
                     errors_by_code[fetched_code] = error
+
+    apply_relative_strength(rows_by_code, metrics_by_code)
+    if min_score is not None:
+        rows_by_code = {
+            code: row
+            for code, row in rows_by_code.items()
+            if float(row.get("信号评分", 0)) >= float(min_score)
+        }
 
     rows: list[dict[str, object]] = [rows_by_code[code] for code in normalized_codes if code in rows_by_code]
     errors: list[dict[str, str]] = [
