@@ -143,6 +143,21 @@ CREATE TABLE IF NOT EXISTS sector_rotation_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_sector_rotation_trade_date ON sector_rotation_snapshots(trade_date);
 CREATE INDEX IF NOT EXISTS idx_sector_rotation_score ON sector_rotation_snapshots(rotation_score);
+
+CREATE TABLE IF NOT EXISTS limit_up_review_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    limit_up_candidate_id INTEGER NOT NULL,
+    horizon TEXT NOT NULL,
+    future_trade_date TEXT NOT NULL,
+    future_close_price REAL,
+    pct_return REAL,
+    max_drawdown REAL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (limit_up_candidate_id) REFERENCES limit_up_candidates(id) ON DELETE CASCADE,
+    UNIQUE (limit_up_candidate_id, horizon)
+);
+
+CREATE INDEX IF NOT EXISTS idx_limit_up_review_horizon ON limit_up_review_snapshots(horizon);
 """
 
 MIGRATIONS_SQL = [

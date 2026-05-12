@@ -87,6 +87,13 @@ class LimitUpBreakthroughRequest(BaseModel):
     pool_limit: int = Field(default=200, ge=1, le=1000)
 
 
+class LimitUpReviewRequest(BaseModel):
+    trade_date: str = ""
+    code: str = ""
+    horizons: list[int] = Field(default_factory=lambda: [1, 3, 5])
+    adjust: str = "qfq"
+
+
 class SectorRotationRequest(BaseModel):
     trade_date: str = ""
     sector_type: str = "industry"
@@ -476,6 +483,71 @@ def api_list_limit_up_breakthroughs(
             trade_date=trade_date.strip() if trade_date else None,
             code=code.strip() if code else None,
             limit=int(limit),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.post("/api/limit-up/reviews/backfill")
+def api_backfill_limit_up_reviews(req: LimitUpReviewRequest) -> dict[str, Any]:
+    try:
+        result = limit_up_service.backfill_limit_up_review_snapshots(
+            trade_date=req.trade_date.strip() or None,
+            code=req.code.strip() or None,
+            horizons=req.horizons,
+            adjust=req.adjust.strip(),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": result["count"],
+            "items": result["items"],
+            "errors": result["errors"],
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/limit-up/reviews/snapshots")
+def api_list_limit_up_review_snapshots(
+    trade_date: str | None = None,
+    code: str | None = None,
+    horizon: str | None = None,
+    limit: int = Query(default=500, ge=1, le=2000),
+) -> dict[str, Any]:
+    try:
+        items = limit_up_service.list_limit_up_review_snapshots(
+            trade_date=trade_date.strip() if trade_date else None,
+            code=code.strip() if code else None,
+            horizon=horizon.strip() if horizon else None,
+            limit=int(limit),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/limit-up/reviews/stats")
+def api_limit_up_review_stats(
+    horizon: str = Query(default="T+3"),
+    trade_date: str | None = None,
+    code: str | None = None,
+) -> dict[str, Any]:
+    try:
+        items = limit_up_service.summarize_limit_up_review_stats(
+            horizon=horizon.strip() or "T+3",
+            trade_date=trade_date.strip() if trade_date else None,
+            code=code.strip() if code else None,
         )
         return {
             "as_of": tdx_service.now_ts(),

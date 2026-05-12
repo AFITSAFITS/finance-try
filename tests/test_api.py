@@ -505,3 +505,57 @@ def test_sector_rotation_api(monkeypatch, tmp_path) -> None:
     body = resp.json()
     assert body["count"] == 1
     assert body["items"][0]["signal"] == "活跃低位"
+
+
+def test_limit_up_review_backfill_api(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+
+    def fake_backfill_limit_up_review_snapshots(**kwargs):
+        assert kwargs["trade_date"] == "2026-05-12"
+        assert kwargs["horizons"] == [1, 3, 5]
+        return {
+            "count": 1,
+            "items": [{"code": "600001", "horizon": "T+3", "pct_return": 12.5}],
+            "errors": [],
+        }
+
+    monkeypatch.setattr(
+        api_module.limit_up_service,
+        "backfill_limit_up_review_snapshots",
+        fake_backfill_limit_up_review_snapshots,
+    )
+
+    resp = client.post(
+        "/api/limit-up/reviews/backfill",
+        json={"trade_date": "2026-05-12", "horizons": [1, 3, 5]},
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["items"][0]["pct_return"] == 12.5
+
+
+def test_limit_up_review_stats_api(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api_module.limit_up_service,
+        "summarize_limit_up_review_stats",
+        lambda **kwargs: [
+            {
+                "score_bucket": "80+",
+                "sample_count": 3,
+                "avg_return": 8.2,
+                "win_rate": 0.67,
+                "avg_max_drawdown": -3.1,
+                "avg_sector_limit_up_count": 4.0,
+                "horizon": "T+3",
+            }
+        ],
+    )
+
+    resp = client.get("/api/limit-up/reviews/stats", params={"horizon": "T+3"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["items"][0]["score_bucket"] == "80+"

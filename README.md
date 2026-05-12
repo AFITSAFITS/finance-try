@@ -29,6 +29,7 @@
   - 结合近期高点、均线、连板、封板稳定性评分
   - 统计同板块涨停数量和热度排名，识别板块共振
   - 按交易日保存候选股票
+  - 支持回填 T+1 / T+3 / T+5 后续表现，按评分分层复盘
 - 板块轮动监控
   - 支持行业板块与概念板块
   - 结合近期活跃度和 60 日位置打分
@@ -41,6 +42,7 @@
   - 通知结果写入 `notification_deliveries`
   - 复盘结果写入 `review_snapshots`
   - 涨停突破写入 `limit_up_candidates`
+  - 涨停候选复盘写入 `limit_up_review_snapshots`
   - 板块轮动写入 `sector_rotation_snapshots`
 - 页面与接口
   - FastAPI API
@@ -181,6 +183,7 @@ python scripts/run_scan_worker.py --run-once --channel feishu_webhook
 ```bash
 python scripts/review_signal_outcomes.py
 python scripts/review_signal_outcomes.py --trade-date 2026-04-08 --summary-horizon T+3
+python scripts/review_signal_outcomes.py --target limit-up --trade-date 2026-05-12 --summary-horizon T+3
 ```
 
 ### 涨停突破候选
@@ -269,6 +272,24 @@ curl -X POST http://127.0.0.1:8000/api/limit-up/breakthroughs \
   }'
 ```
 
+### 回填涨停候选后续表现
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/limit-up/reviews/backfill \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "trade_date": "2026-05-12",
+    "horizons": [1, 3, 5],
+    "adjust": "qfq"
+  }'
+```
+
+### 查看涨停候选复盘统计
+
+```bash
+curl 'http://127.0.0.1:8000/api/limit-up/reviews/stats?trade_date=2026-05-12&horizon=T%2B3'
+```
+
 ### 扫描并保存板块轮动
 
 ```bash
@@ -295,7 +316,7 @@ streamlit run app/ui.py
 - `日线信号扫描`
   支持批量输入股票，支持勾选“仅保留水下金叉后水上再次金叉”
 - `涨停突破`
-  扫描每日涨停池，保存高评分突破候选，也可以查看历史候选
+  扫描每日涨停池，保存高评分突破候选，也可以查看历史候选和后续表现复盘
 - `板块轮动`
   扫描行业或概念板块，保存活跃低位板块快照
 - `今日提醒`
@@ -315,8 +336,9 @@ streamlit run app/ui.py
 - 页面能区分“没有命中信号”和“行情源连接失败”
 - 默认股票池与事件库持久化到 SQLite
 - 支持把扫描结果转成事件与复盘快照
-  - 支持把涨停突破候选和板块轮动快照按交易日保存
-  - 涨停候选会保留同板块涨停数量，便于判断是否只是单票异动
+- 支持把涨停突破候选和板块轮动快照按交易日保存
+- 涨停候选会保留同板块涨停数量，便于判断是否只是单票异动
+- 涨停候选支持按评分分层复盘，观察后续收益、胜率和回撤
 - 支持 CLI、API、UI 三种入口
 
 ## 部署
@@ -422,6 +444,7 @@ python -m py_compile app/*.py scripts/get_stock_data.py scripts/run_daily_scan.p
 - 飞书通知发送与重试单测
 - worker 定时执行与命令入口单测
 - 涨停突破候选扫描与保存单测
+- 涨停候选复盘回填与统计单测
 - 板块轮动扫描与保存单测
 
 如果你要继续往“可部署、可运维”推进，下一步应该补的是：

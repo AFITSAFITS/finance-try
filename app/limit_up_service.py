@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 import json
 import sqlite3
 from datetime import datetime
@@ -8,6 +9,7 @@ from typing import Any, Callable
 import pandas as pd
 
 from app import db
+from app import bar_service
 from app import signal_service
 from app import tdx_service
 
@@ -136,6 +138,7 @@ def analyze_limit_up_candidate(
                 code,
             )
         )
+        bar_service.upsert_daily_bars(code, history, adjust="qfq")
     except Exception as exc:  # noqa: BLE001
         history = pd.DataFrame()
         payload["history_error"] = str(exc)
@@ -385,3 +388,297 @@ def list_limit_up_candidates(
             tuple(params),
         ).fetchall()
     return [_row_to_candidate(row) for row in rows]
+
+
+def parse_horizons(values: list[int] | tuple[int, ...] | None) -> list[int]:
+    raw_values = list(values or [1, 3, 5])
+    normalized = sorted({int(value) for value in raw_values if int(value) > 0})
+    return normalized or [1, 3, 5]
+
+
+def horizon_label(days: int) -> str:
+    return f"T+{int(days)}"
+
+
+def _load_limit_up_candidates(
+    trade_date: str | None = None,
+    code: str | None = None,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    params: list[object] = []
+    if trade_date:
+        clauses.append("trade_date = ?")
+        params.append(normalize_trade_date(trade_date))
+    if code:
+        clauses.append("code = ?")
+        params.append(tdx_service.format_code(code))
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    with db.get_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT id, trade_date, code, name, sector, close_price, score,
+                   sector_limit_up_count, sector_heat_rank, reason
+            FROM limit_up_candidates
+            {where_sql}
+            ORDER BY trade_date ASC, code ASC, id ASC
+            """,
+            tuple(params),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _cached_daily_bars_to_history_df(rows: list[dict[str, Any]]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "日期": row["trade_date"],
+                "股票代码": row["code"],
+                "开盘": row["open"],
+                "收盘": row["close"],
+                "最高": row["high"],
+                "最低": row["low"],
+                "成交量": row["volume"],
+                "成交额": row["amount"],
+                "涨跌幅": row["pct_change"],
+                "换手率": row["turnover_rate"],
+            }
+            for row in rows
+        ]
+    )
+
+
+def fetch_daily_history_range_with_cache(
+    code: str,
+    start_date: str,
+    end_date: str,
+    adjust: str = "qfq",
+) -> pd.DataFrame:
+    start = normalize_trade_date(start_date)
+    end = normalize_trade_date(end_date)
+    cached_rows = [
+        row
+        for row in bar_service.list_daily_bars(code, adjust=adjust)
+        if start <= str(row["trade_date"]) <= end
+    ]
+    if cached_rows:
+        return signal_service.normalize_history_df(
+            _cached_daily_bars_to_history_df(cached_rows),
+            code,
+        )
+    return bar_service.fetch_daily_history_range_akshare(code, start, end, adjust)
+
+
+def _row_to_review(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "limit_up_candidate_id": row["limit_up_candidate_id"],
+        "trade_date": row["trade_date"],
+        "code": row["code"],
+        "name": row["name"],
+        "sector": row["sector"],
+        "score": row["score"],
+        "sector_limit_up_count": row["sector_limit_up_count"],
+        "sector_heat_rank": row["sector_heat_rank"],
+        "horizon": row["horizon"],
+        "future_trade_date": row["future_trade_date"],
+        "future_close_price": row["future_close_price"],
+        "pct_return": row["pct_return"],
+        "max_drawdown": row["max_drawdown"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def list_limit_up_review_snapshots(
+    trade_date: str | None = None,
+    code: str | None = None,
+    horizon: str | None = None,
+    limit: int = 500,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    params: list[object] = []
+    if trade_date:
+        clauses.append("c.trade_date = ?")
+        params.append(normalize_trade_date(trade_date))
+    if code:
+        clauses.append("c.code = ?")
+        params.append(tdx_service.format_code(code))
+    if horizon:
+        clauses.append("r.horizon = ?")
+        params.append(horizon)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    params.append(int(limit))
+
+    with db.get_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT r.id, r.limit_up_candidate_id, c.trade_date, c.code, c.name, c.sector,
+                   c.score, c.sector_limit_up_count, c.sector_heat_rank,
+                   r.horizon, r.future_trade_date, r.future_close_price,
+                   r.pct_return, r.max_drawdown, r.updated_at
+            FROM limit_up_review_snapshots r
+            JOIN limit_up_candidates c ON c.id = r.limit_up_candidate_id
+            {where_sql}
+            ORDER BY c.trade_date DESC, c.score DESC, c.code ASC, r.horizon ASC
+            LIMIT ?
+            """,
+            tuple(params),
+        ).fetchall()
+    return [_row_to_review(row) for row in rows]
+
+
+def backfill_limit_up_review_snapshots(
+    trade_date: str | None = None,
+    code: str | None = None,
+    horizons: list[int] | tuple[int, ...] | None = None,
+    adjust: str = "qfq",
+    fetcher: Callable[[str, str, str, str], pd.DataFrame] = fetch_daily_history_range_with_cache,
+) -> dict[str, Any]:
+    selected_horizons = parse_horizons(horizons)
+    candidates = _load_limit_up_candidates(trade_date=trade_date, code=code)
+    if not candidates:
+        return {"count": 0, "items": [], "errors": []}
+
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for candidate in candidates:
+        grouped[str(candidate["code"])].append(candidate)
+
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    snapshots: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+
+    with db.get_connection() as conn:
+        for stock_code, code_candidates in grouped.items():
+            start_date = min(str(item["trade_date"]) for item in code_candidates)
+            try:
+                history_df = fetcher(stock_code, start_date, end_date, adjust)
+                normalized = signal_service.normalize_history_df(history_df, stock_code)
+                if normalized.empty:
+                    continue
+
+                bar_service.upsert_daily_bars(stock_code, normalized, adjust=adjust)
+                indexed = normalized.copy()
+                indexed["日期字符串"] = indexed["日期"].map(signal_service.format_trade_date)
+                date_to_index = {
+                    str(row["日期字符串"]): idx
+                    for idx, row in indexed.iterrows()
+                }
+
+                for candidate in code_candidates:
+                    candidate_date = str(candidate["trade_date"])
+                    base_index = date_to_index.get(candidate_date)
+                    if base_index is None:
+                        continue
+
+                    base_close = (
+                        float(candidate["close_price"])
+                        if candidate.get("close_price") is not None and float(candidate["close_price"]) > 0
+                        else float(indexed.iloc[base_index]["收盘"])
+                    )
+                    for horizon_days in selected_horizons:
+                        future_index = base_index + int(horizon_days)
+                        if future_index >= len(indexed.index):
+                            continue
+                        future_row = indexed.iloc[future_index]
+                        window = indexed.iloc[base_index + 1 : future_index + 1]
+                        if window.empty:
+                            continue
+
+                        future_close = float(future_row["收盘"])
+                        pct_return = round(((future_close / base_close) - 1.0) * 100.0, 4)
+                        max_drawdown = round((((window["收盘"] / base_close) - 1.0).min()) * 100.0, 4)
+                        label = horizon_label(horizon_days)
+                        now = tdx_service.now_ts()
+                        conn.execute(
+                            """
+                            INSERT INTO limit_up_review_snapshots (
+                                limit_up_candidate_id, horizon, future_trade_date,
+                                future_close_price, pct_return, max_drawdown, updated_at
+                            )
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(limit_up_candidate_id, horizon)
+                            DO UPDATE SET
+                                future_trade_date=excluded.future_trade_date,
+                                future_close_price=excluded.future_close_price,
+                                pct_return=excluded.pct_return,
+                                max_drawdown=excluded.max_drawdown,
+                                updated_at=excluded.updated_at
+                            """,
+                            (
+                                int(candidate["id"]),
+                                label,
+                                signal_service.format_trade_date(future_row["日期"]),
+                                future_close,
+                                pct_return,
+                                max_drawdown,
+                                now,
+                            ),
+                        )
+                        saved = conn.execute(
+                            """
+                            SELECT r.id, r.limit_up_candidate_id, c.trade_date, c.code, c.name, c.sector,
+                                   c.score, c.sector_limit_up_count, c.sector_heat_rank,
+                                   r.horizon, r.future_trade_date, r.future_close_price,
+                                   r.pct_return, r.max_drawdown, r.updated_at
+                            FROM limit_up_review_snapshots r
+                            JOIN limit_up_candidates c ON c.id = r.limit_up_candidate_id
+                            WHERE r.limit_up_candidate_id = ? AND r.horizon = ?
+                            """,
+                            (int(candidate["id"]), label),
+                        ).fetchone()
+                        assert saved is not None
+                        snapshots.append(_row_to_review(saved))
+            except Exception as exc:  # noqa: BLE001
+                errors.append({"股票代码": stock_code, "error": str(exc)})
+
+    snapshots.sort(key=lambda item: (item["trade_date"], item["code"], item["horizon"]))
+    return {"count": len(snapshots), "items": snapshots, "errors": errors}
+
+
+def summarize_limit_up_review_stats(
+    horizon: str = "T+3",
+    trade_date: str | None = None,
+    code: str | None = None,
+) -> list[dict[str, Any]]:
+    snapshots = list_limit_up_review_snapshots(
+        trade_date=trade_date,
+        code=code,
+        horizon=horizon,
+        limit=5000,
+    )
+    if not snapshots:
+        return []
+
+    df = pd.DataFrame(snapshots)
+    df["score_bucket"] = pd.cut(
+        df["score"].fillna(0),
+        bins=[-1, 40, 60, 80, 101],
+        labels=["0-40", "40-60", "60-80", "80+"],
+    )
+    grouped = (
+        df.groupby("score_bucket", observed=True)
+        .agg(
+            sample_count=("pct_return", "count"),
+            avg_return=("pct_return", "mean"),
+            win_rate=("pct_return", lambda s: float((s > 0).mean())),
+            avg_max_drawdown=("max_drawdown", "mean"),
+            avg_sector_limit_up_count=("sector_limit_up_count", "mean"),
+        )
+        .reset_index()
+    )
+
+    items: list[dict[str, Any]] = []
+    for _, row in grouped.iterrows():
+        items.append(
+            {
+                "score_bucket": str(row["score_bucket"]),
+                "sample_count": int(row["sample_count"]),
+                "avg_return": round(float(row["avg_return"]), 4),
+                "win_rate": round(float(row["win_rate"]), 4),
+                "avg_max_drawdown": round(float(row["avg_max_drawdown"]), 4),
+                "avg_sector_limit_up_count": round(float(row["avg_sector_limit_up_count"]), 4)
+                if not pd.isna(row["avg_sector_limit_up_count"])
+                else None,
+                "horizon": horizon,
+            }
+        )
+    return items

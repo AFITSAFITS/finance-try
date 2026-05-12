@@ -317,6 +317,81 @@ def main() -> None:
                 ]
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "limit_up_breakthrough_history.csv")
 
+        st.divider()
+        st.caption("对已保存的涨停候选做后续表现复盘，用来判断评分分层是否真的有效。")
+        c1, c2 = st.columns(2)
+        review_horizon = c1.selectbox("复盘统计周期", options=["T+1", "T+3", "T+5"], index=1, key="limit_review_horizon")
+        review_code = c2.text_input("股票代码过滤（可选）", value="", key="limit_review_code")
+
+        if st.button("回填涨停候选复盘"):
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/limit-up/reviews/backfill",
+                    payload={
+                        "trade_date": str(limit_trade_date),
+                        "code": review_code.strip(),
+                        "horizons": [1, 3, 5],
+                        "adjust": "qfq",
+                    },
+                    timeout_seconds=900,
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"回填失败: {exc}")
+                st.stop()
+
+            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            for error in data.get("errors", []):
+                st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
+            df = pd.DataFrame(data.get("items", []))
+            if df.empty:
+                st.warning("没有生成新的涨停候选复盘。")
+            else:
+                cols = [
+                    "trade_date",
+                    "code",
+                    "name",
+                    "score",
+                    "sector_limit_up_count",
+                    "horizon",
+                    "future_trade_date",
+                    "pct_return",
+                    "max_drawdown",
+                ]
+                show_downloadable_table(df[[c for c in cols if c in df.columns]], "limit_up_review_snapshots.csv")
+
+        if st.button("加载涨停候选复盘统计"):
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/limit-up/reviews/stats",
+                    method="GET",
+                    params={
+                        "trade_date": str(limit_trade_date),
+                        "code": review_code.strip(),
+                        "horizon": review_horizon,
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"加载失败: {exc}")
+                st.stop()
+
+            df = pd.DataFrame(data.get("items", []))
+            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            if df.empty:
+                st.warning("当前条件下没有涨停候选复盘统计。")
+            else:
+                cols = [
+                    "score_bucket",
+                    "sample_count",
+                    "avg_return",
+                    "win_rate",
+                    "avg_max_drawdown",
+                    "avg_sector_limit_up_count",
+                    "horizon",
+                ]
+                show_downloadable_table(df[[c for c in cols if c in df.columns]], "limit_up_review_stats.csv")
+
     with sector_tab:
         st.caption("扫描行业或概念板块，优先找近期活跃、但仍处于相对低位的板块。")
         c1, c2, c3, c4 = st.columns(4)
