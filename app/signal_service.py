@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from datetime import datetime, timedelta, timezone
+import os
 from typing import Callable, Iterable
 
 import pandas as pd
@@ -20,6 +21,7 @@ EASTMONEY_HISTORY_HEADERS = {
     "Connection": "close",
 }
 SECONDARY_GOLDEN_CROSS_PATTERN = "水下金叉后水上再次金叉"
+DEFAULT_PROVIDER_TIMEOUT_SECONDS = 12.0
 
 SIGNAL_OUTPUT_COLUMNS = [
     "股票代码",
@@ -48,6 +50,33 @@ def _suppress_akshare_progress() -> None:
     for module in (stock_zh_a_sina, stock_hist_tx):
         if hasattr(module, "get_tqdm"):
             module.get_tqdm = lambda enable=True, _silent_tqdm=silent_tqdm: _silent_tqdm
+
+
+def provider_timeout_seconds() -> float:
+    raw_value = os.getenv("AI_FINANCE_PROVIDER_TIMEOUT_SECONDS", "").strip()
+    if not raw_value:
+        return DEFAULT_PROVIDER_TIMEOUT_SECONDS
+    try:
+        value = float(raw_value)
+    except ValueError:
+        return DEFAULT_PROVIDER_TIMEOUT_SECONDS
+    return max(1.0, value)
+
+
+def _call_provider_with_timeout(
+    provider_name: str,
+    provider: Callable[[], pd.DataFrame],
+    timeout_seconds: float,
+) -> pd.DataFrame:
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(provider)
+    try:
+        return future.result(timeout=timeout_seconds)
+    except FuturesTimeoutError as exc:
+        future.cancel()
+        raise TimeoutError(f"{provider_name} timeout after {timeout_seconds:g}s") from exc
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 def format_trade_date(value: object) -> str:
@@ -515,8 +544,10 @@ def fetch_daily_history_best_effort(
     start_date: str,
     end_date: str,
     adjust: str = "qfq",
+    provider_timeout: float | None = None,
 ) -> pd.DataFrame:
     errors: list[str] = []
+    timeout_seconds = provider_timeout_seconds() if provider_timeout is None else max(0.05, float(provider_timeout))
     providers: list[tuple[str, Callable[[], pd.DataFrame]]] = [
         (
             "eastmoney",
@@ -575,7 +606,7 @@ def fetch_daily_history_best_effort(
 
     for provider_name, provider in providers:
         try:
-            df = provider()
+            df = _call_provider_with_timeout(provider_name, provider, timeout_seconds)
             if not df.empty:
                 return df
             errors.append(f"{provider_name}: empty")

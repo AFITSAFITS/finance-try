@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import pandas as pd
 import requests
 
@@ -281,6 +283,37 @@ def test_fetch_daily_history_best_effort_falls_back_to_tencent(monkeypatch) -> N
         adjust="qfq",
     )
 
+    assert list(df["收盘"]) == [10.0, 11.0]
+
+
+def test_fetch_daily_history_best_effort_skips_timed_out_provider(monkeypatch) -> None:
+    monkeypatch.setattr(
+        signal_service,
+        "fetch_daily_history_eastmoney",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("eastmoney down")),
+    )
+
+    def slow_akshare(**kwargs):
+        time.sleep(0.3)
+        return make_history(kwargs["code"], [9.0, 9.5])
+
+    monkeypatch.setattr(signal_service, "_fetch_daily_history_akshare_provider", slow_akshare)
+    monkeypatch.setattr(
+        signal_service,
+        "_fetch_daily_history_tx_provider",
+        lambda code, start_date, end_date, adjust: make_history(code, [10.0, 11.0]),
+    )
+
+    started_at = time.perf_counter()
+    df = signal_service.fetch_daily_history_best_effort(
+        code="600001",
+        start_date="20260401",
+        end_date="20260408",
+        adjust="qfq",
+        provider_timeout=0.1,
+    )
+
+    assert time.perf_counter() - started_at < 0.25
     assert list(df["收盘"]) == [10.0, 11.0]
 
 
