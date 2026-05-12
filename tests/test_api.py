@@ -170,6 +170,55 @@ def test_realtime_quotes_api_requires_codes() -> None:
     assert "至少提供一个股票代码" in resp.json()["detail"]
 
 
+def test_default_watchlist_realtime_quotes_api(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api_module.watchlist_service,
+        "get_default_watchlist",
+        lambda: {
+            "id": 1,
+            "name": "默认股票池",
+            "count": 2,
+            "items": [{"code": "600519"}, {"code": "000001"}],
+        },
+    )
+
+    def fake_fetch_realtime_quotes_best_effort(codes):
+        assert codes == ["600519", "000001"]
+        return (
+            [{"code": "600519", "latest_price": 1354.55, "source": "eastmoney"}],
+            [{"股票代码": "000001", "error": "未返回实时行情"}],
+            "eastmoney",
+        )
+
+    monkeypatch.setattr(
+        api_module.realtime_quote_service,
+        "fetch_realtime_quotes_best_effort",
+        fake_fetch_realtime_quotes_best_effort,
+    )
+
+    resp = client.get("/api/market/realtime-quotes/default")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["requested_count"] == 2
+    assert body["error_count"] == 1
+    assert body["watchlist"]["name"] == "默认股票池"
+
+
+def test_default_watchlist_realtime_quotes_requires_items(monkeypatch) -> None:
+    monkeypatch.setattr(
+        api_module.watchlist_service,
+        "get_default_watchlist",
+        lambda: {"id": 1, "name": "默认股票池", "count": 0, "items": []},
+    )
+
+    resp = client.get("/api/market/realtime-quotes/default")
+
+    assert resp.status_code == 400
+    assert "默认股票池为空" in resp.json()["detail"]
+
+
 def test_thsdk_klines_unavailable(monkeypatch) -> None:
     def fake_klines_thsdk(**kwargs):
         raise thsdk_service.ThsdkUnavailableError("thsdk python runtime not found")

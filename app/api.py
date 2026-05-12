@@ -241,6 +241,34 @@ def api_realtime_quotes(req: RealtimeQuotesRequest) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
 
 
+@app.get("/api/market/realtime-quotes/default")
+def api_default_watchlist_realtime_quotes() -> dict[str, Any]:
+    try:
+        watchlist = watchlist_service.get_default_watchlist()
+        codes = [str(item["code"]) for item in watchlist["items"]]
+        if not codes:
+            raise ValueError("默认股票池为空，请先保存股票代码")
+        items, errors, source = realtime_quote_service.fetch_realtime_quotes_best_effort(codes)
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "requested_count": len(codes),
+            "error_count": len(errors),
+            "items": items,
+            "errors": errors,
+            "source": source,
+            "watchlist": {
+                "id": watchlist["id"],
+                "name": watchlist["name"],
+                "count": watchlist["count"],
+            },
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
 @app.post("/api/thsdk/klines")
 def api_thsdk_klines(req: ThsdkKlinesRequest) -> dict[str, Any]:
     try:

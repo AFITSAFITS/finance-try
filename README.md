@@ -284,6 +284,12 @@ curl -X POST http://127.0.0.1:8000/api/market/realtime-quotes \
 
 返回里会包含当前价、涨跌幅、成交额、换手率、量比、数据质量、盘中观察提示和数据来源。
 
+也可以直接查询默认股票池：
+
+```bash
+curl 'http://127.0.0.1:8000/api/market/realtime-quotes/default'
+```
+
 ### 仅筛选“水下金叉后水上再次金叉”
 
 ```bash

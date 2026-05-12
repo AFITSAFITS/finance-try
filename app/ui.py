@@ -171,9 +171,25 @@ def main() -> None:
     with quote_tab:
         st.caption("快速查看当前价格和涨跌情况；优先使用东方财富，失败时自动尝试腾讯。")
         codes_text = st.text_area("股票代码（每行一个）", value=DEFAULT_CODES, height=160, key="quote_codes")
-        if st.button("查询实时行情", type="primary"):
+        c1, c2, c3 = st.columns(3)
+        if c1.button("从默认股票池载入", key="quote_load_default_watchlist"):
             try:
-                data = request_api(
+                watchlist = request_api(
+                    api_base,
+                    "/api/watchlists/default",
+                    method="GET",
+                    timeout_seconds=60,
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"加载默认股票池失败: {exc}")
+                st.stop()
+            st.session_state["quote_codes"] = "\n".join(str(item.get("code", "")) for item in watchlist.get("items", []))
+            st.rerun()
+
+        quote_data = None
+        if c2.button("查询实时行情", type="primary"):
+            try:
+                quote_data = request_api(
                     api_base,
                     "/api/market/realtime-quotes",
                     payload={"codes_text": codes_text},
@@ -183,13 +199,29 @@ def main() -> None:
                 st.error(f"查询失败: {exc}")
                 st.stop()
 
+        if c3.button("查询默认股票池实时行情"):
+            try:
+                quote_data = request_api(
+                    api_base,
+                    "/api/market/realtime-quotes/default",
+                    method="GET",
+                    timeout_seconds=120,
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"查询失败: {exc}")
+                st.stop()
+
+        if quote_data is not None:
             st.caption(
-                f"as_of={data.get('as_of', '')} | source={data.get('source', 'unknown')} | "
-                f"count={data.get('count', 0)} | errors={data.get('error_count', 0)}"
+                f"as_of={quote_data.get('as_of', '')} | source={quote_data.get('source', 'unknown')} | "
+                f"count={quote_data.get('count', 0)} | errors={quote_data.get('error_count', 0)}"
             )
-            for error in data.get("errors", []):
+            watchlist_info = quote_data.get("watchlist") or {}
+            if watchlist_info:
+                st.caption(f"watchlist={watchlist_info.get('name', '')} | requested={quote_data.get('requested_count', 0)}")
+            for error in quote_data.get("errors", []):
                 st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
-            df = pd.DataFrame(data.get("items", []))
+            df = pd.DataFrame(quote_data.get("items", []))
             if df.empty:
                 st.warning("没有取到实时行情。")
             else:
