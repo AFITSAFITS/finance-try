@@ -43,6 +43,8 @@ SIGNAL_OUTPUT_COLUMNS = [
     "20日涨幅",
     "60日涨幅",
     "相对强度",
+    "K线形态",
+    "K线提示",
     "风险提示",
     "均线信号",
     "信号",
@@ -183,6 +185,33 @@ def detect_macd_secondary_golden_cross_above_zero(enriched_df: pd.DataFrame) -> 
     return False
 
 
+def extract_candlestick_profile(row: pd.Series) -> dict[str, object]:
+    close = row.get("收盘")
+    if pd.isna(close):
+        return {"K线形态": None, "K线提示": ""}
+
+    close_price = float(close)
+    open_price = close_price if pd.isna(row.get("开盘")) else float(row.get("开盘"))
+    high_price = max(open_price, close_price) if pd.isna(row.get("最高")) else float(row.get("最高"))
+    low_price = min(open_price, close_price) if pd.isna(row.get("最低")) else float(row.get("最低"))
+
+    price_range = high_price - low_price
+    if price_range <= 0 or open_price <= 0:
+        return {"K线形态": "平稳K线", "K线提示": ""}
+
+    body_pct = (close_price / open_price - 1) * 100
+    close_position = (close_price - low_price) / price_range
+    upper_shadow_ratio = (high_price - max(open_price, close_price)) / price_range
+
+    if close_position >= 0.75 and body_pct >= 2:
+        return {"K线形态": "强势收盘", "K线提示": "收盘接近日高"}
+    if upper_shadow_ratio >= 0.45 and close_position <= 0.65:
+        return {"K线形态": "长上影线", "K线提示": "冲高回落"}
+    if close_position <= 0.25 and body_pct <= -2:
+        return {"K线形态": "弱势收盘", "K线提示": "收盘接近日低"}
+    return {"K线形态": "普通K线", "K线提示": ""}
+
+
 def score_signal_row(row: dict[str, object]) -> dict[str, object]:
     score = 50.0
     reasons: list[str] = []
@@ -195,6 +224,7 @@ def score_signal_row(row: dict[str, object]) -> dict[str, object]:
     pct_change = row.get("涨跌幅")
     position_60d = row.get("60日位置")
     volume_ratio = row.get("量能比")
+    candlestick_pattern = str(row.get("K线形态") or "")
 
     if macd_signal == "MACD金叉":
         score += 20
@@ -260,6 +290,17 @@ def score_signal_row(row: dict[str, object]) -> dict[str, object]:
         elif ratio < 0.7:
             score -= 5
             risks.append("量能不足")
+
+    if direction == "偏多":
+        if candlestick_pattern == "强势收盘":
+            score += 5
+            reasons.append("K线收盘较强")
+        elif candlestick_pattern == "长上影线":
+            score -= 8
+            risks.append("冲高回落")
+        elif candlestick_pattern == "弱势收盘":
+            score -= 10
+            risks.append("收盘偏弱")
 
     bounded_score = max(0.0, min(100.0, score))
     if bounded_score >= 80:
@@ -411,6 +452,7 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
         "均线信号": ma_signal,
         "信号": ", ".join(signals),
     }
+    row.update(extract_candlestick_profile(curr_row))
     row.update(score_signal_row(row))
     return row
 

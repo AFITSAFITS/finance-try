@@ -23,6 +23,21 @@ def make_history(code: str, closes: list[float]) -> pd.DataFrame:
     )
 
 
+def make_ohlc_history(
+    code: str,
+    closes: list[float],
+    *,
+    latest_open: float,
+    latest_high: float,
+    latest_low: float,
+) -> pd.DataFrame:
+    df = make_history(code, closes)
+    df.loc[df.index[-1], "开盘"] = latest_open
+    df.loc[df.index[-1], "最高"] = latest_high
+    df.loc[df.index[-1], "最低"] = latest_low
+    return df
+
+
 def test_scan_stock_signal_events_detects_latest_crosses() -> None:
     sample_map = {
         "600001": make_history("600001", [10.0] * 34 + [20.0]),
@@ -86,6 +101,46 @@ def test_score_signal_row_accounts_for_position_and_volume() -> None:
     assert "量能放大" in strong_row["评分原因"]
     assert "接近60日高位" in high_weak_row["风险提示"]
     assert "量能不足" in high_weak_row["风险提示"]
+
+
+def test_extract_candlestick_profile_detects_strong_and_upper_shadow() -> None:
+    strong = signal_service.extract_candlestick_profile(
+        pd.Series({"开盘": 10.0, "收盘": 10.5, "最高": 10.55, "最低": 9.95})
+    )
+    upper_shadow = signal_service.extract_candlestick_profile(
+        pd.Series({"开盘": 10.0, "收盘": 10.2, "最高": 11.2, "最低": 9.9})
+    )
+
+    assert strong["K线形态"] == "强势收盘"
+    assert upper_shadow["K线形态"] == "长上影线"
+    assert upper_shadow["K线提示"] == "冲高回落"
+
+
+def test_candlestick_profile_adjusts_bullish_signal_score() -> None:
+    strong_row = signal_service.score_signal_row(
+        {
+            "MACD信号": "MACD金叉",
+            "均线信号": "MA5上穿MA20",
+            "涨跌幅": 2.0,
+            "60日位置": 0.5,
+            "量能比": 1.0,
+            "K线形态": "强势收盘",
+        }
+    )
+    upper_shadow_row = signal_service.score_signal_row(
+        {
+            "MACD信号": "MACD金叉",
+            "均线信号": "MA5上穿MA20",
+            "涨跌幅": 2.0,
+            "60日位置": 0.5,
+            "量能比": 1.0,
+            "K线形态": "长上影线",
+        }
+    )
+
+    assert strong_row["信号评分"] > upper_shadow_row["信号评分"]
+    assert "K线收盘较强" in strong_row["评分原因"]
+    assert "冲高回落" in upper_shadow_row["风险提示"]
 
 
 def test_scan_stock_signal_events_collects_fetch_errors() -> None:
@@ -236,6 +291,29 @@ def test_relative_strength_can_filter_weak_pool_signal() -> None:
 
     assert errors == []
     assert "600001" not in set(df["股票代码"])
+
+
+def test_scan_stock_signal_events_outputs_candlestick_profile() -> None:
+    sample_map = {
+        "600001": make_ohlc_history("600001", [10.0] * 64 + [20.0], latest_open=19.0, latest_high=20.1, latest_low=18.8),
+        "600002": make_ohlc_history("600002", [10.0] * 64 + [20.0], latest_open=19.8, latest_high=23.0, latest_low=19.5),
+    }
+
+    def fake_fetcher(code: str, lookback_days: int = 180, adjust: str = "qfq") -> pd.DataFrame:
+        return sample_map[code].copy()
+
+    df, errors = signal_service.scan_stock_signal_events(
+        codes=["600001", "600002"],
+        fetcher=fake_fetcher,
+        max_workers=1,
+    )
+
+    assert errors == []
+    strong_row = df[df["股票代码"] == "600001"].iloc[0]
+    upper_shadow_row = df[df["股票代码"] == "600002"].iloc[0]
+    assert strong_row["K线形态"] == "强势收盘"
+    assert upper_shadow_row["K线形态"] == "长上影线"
+    assert "冲高回落" in upper_shadow_row["风险提示"]
 
 
 class _FakeResponse:
