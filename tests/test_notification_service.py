@@ -74,6 +74,32 @@ def test_build_feishu_webhook_payload_adds_signature(monkeypatch) -> None:
     assert payload["sign"] == "jWsBkWnzlRKtaP+iZgwraSojMWik4cJR7aysApQZuoA="
 
 
+def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
+    monkeypatch.setattr(notification_service.time, "time", lambda: 1_710_000_000)
+
+    payload = notification_service.build_feishu_event_card_payload(
+        {
+            "trade_date": "2026-05-12",
+            "code": "600519",
+            "summary": "MACD金叉",
+            "severity": "high",
+            "indicator": "MACD",
+            "event_type": "golden_cross",
+            "close_price": 1530.25,
+            "pct_change": 3.2,
+            "payload": {"signal": "MACD金叉, MA5上穿MA20"},
+        },
+        secret="secret",
+    )
+
+    assert payload["msg_type"] == "interactive"
+    assert payload["card"]["header"]["template"] == "red"
+    assert payload["card"]["header"]["title"]["content"] == "600519 MACD金叉"
+    assert payload["card"]["elements"][0]["text"]["content"] == "**MACD金叉, MA5上穿MA20**"
+    assert payload["timestamp"] == "1710000000"
+    assert payload["sign"] == "jWsBkWnzlRKtaP+iZgwraSojMWik4cJR7aysApQZuoA="
+
+
 def test_deliver_signal_events_posts_to_feishu_webhook(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
     monkeypatch.setenv("AI_FINANCE_FEISHU_WEBHOOK", "https://open.feishu.cn/open-apis/bot/v2/hook/test")
@@ -116,8 +142,8 @@ def test_deliver_signal_events_posts_to_feishu_webhook(monkeypatch, tmp_path) ->
     assert {item["status"] for item in deliveries} == {"delivered"}
     assert len(calls) == 1
     assert calls[0]["url"] == "https://open.feishu.cn/open-apis/bot/v2/hook/test"
-    assert calls[0]["json"]["msg_type"] == "text"
-    assert "600519" in calls[0]["json"]["content"]["text"]
+    assert calls[0]["json"]["msg_type"] == "interactive"
+    assert "600519" in calls[0]["json"]["card"]["header"]["title"]["content"]
 
 
 def test_deliver_signal_events_retries_failed_feishu_webhook(monkeypatch, tmp_path) -> None:

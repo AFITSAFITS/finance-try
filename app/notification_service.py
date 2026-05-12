@@ -27,15 +27,107 @@ def format_event_message(event: dict[str, Any]) -> str:
     )
 
 
+def _clean_display(value: object, default: str = "-") -> str:
+    if value is None:
+        return default
+    raw = str(value).strip()
+    return raw if raw and raw.lower() != "nan" else default
+
+
+def _format_number(value: object, suffix: str = "") -> str:
+    if value is None:
+        return "-"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return _clean_display(value)
+    return f"{number:.2f}{suffix}"
+
+
+def _feishu_severity_template(event: dict[str, Any]) -> str:
+    severity = str(event.get("severity", "")).strip().lower()
+    pct_change = event.get("pct_change")
+    try:
+        pct = float(pct_change)
+    except (TypeError, ValueError):
+        pct = 0.0
+    if severity in {"high", "critical"} or pct >= 3:
+        return "red"
+    if pct > 0:
+        return "green"
+    if pct < 0:
+        return "orange"
+    return "blue"
+
+
+def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> dict[str, Any]:
+    code = _clean_display(event.get("code"))
+    summary = _clean_display(event.get("summary"), "交易提醒")
+    trade_date = _clean_display(event.get("trade_date"))
+    indicator = _clean_display(event.get("indicator"))
+    event_type = _clean_display(event.get("event_type"))
+    severity = _clean_display(event.get("severity"))
+    close_price = _format_number(event.get("close_price"))
+    pct_change = _format_number(event.get("pct_change"), "%")
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    signal_text = _clean_display(payload.get("signal"), summary)
+
+    card_payload: dict[str, Any] = {
+        "msg_type": "interactive",
+        "card": {
+            "config": {
+                "wide_screen_mode": True,
+                "enable_forward": True,
+            },
+            "header": {
+                "template": _feishu_severity_template(event),
+                "title": {
+                    "tag": "plain_text",
+                    "content": f"{code} {summary}",
+                },
+            },
+            "elements": [
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": f"**{signal_text}**",
+                    },
+                },
+                {
+                    "tag": "div",
+                    "fields": [
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**日期**\n{trade_date}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**收盘价**\n{close_price}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**涨跌幅**\n{pct_change}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**强度**\n{severity}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**指标**\n{indicator}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**类型**\n{event_type}"}},
+                    ],
+                },
+                {
+                    "tag": "hr",
+                },
+                {
+                    "tag": "note",
+                    "elements": [
+                        {
+                            "tag": "plain_text",
+                            "content": "来自 ai-finance 自动扫描，仅作候选观察。",
+                        }
+                    ],
+                },
+            ],
+        },
+    }
+    return _sign_feishu_payload(card_payload, secret=secret)
+
+
 def build_stdout_messages(events: Iterable[dict[str, Any]]) -> list[str]:
     return [format_event_message(event) for event in events]
 
 
-def build_feishu_webhook_payload(text: str, secret: str = "") -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "msg_type": "text",
-        "content": {"text": text},
-    }
+def _sign_feishu_payload(payload: dict[str, Any], secret: str = "") -> dict[str, Any]:
     normalized_secret = secret.strip()
     if normalized_secret:
         timestamp = str(int(time.time()))
@@ -46,6 +138,14 @@ def build_feishu_webhook_payload(text: str, secret: str = "") -> dict[str, Any]:
         payload["timestamp"] = timestamp
         payload["sign"] = sign
     return payload
+
+
+def build_feishu_webhook_payload(text: str, secret: str = "") -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "msg_type": "text",
+        "content": {"text": text},
+    }
+    return _sign_feishu_payload(payload, secret=secret)
 
 
 def send_feishu_webhook_message(
@@ -59,7 +159,7 @@ def send_feishu_webhook_message(
         raise ValueError("AI_FINANCE_FEISHU_WEBHOOK 未配置")
 
     request_fn = requester or requests.post
-    payload = build_feishu_webhook_payload(format_event_message(event), secret=secret)
+    payload = build_feishu_event_card_payload(event, secret=secret)
     response = request_fn(
         normalized_webhook,
         json=payload,
