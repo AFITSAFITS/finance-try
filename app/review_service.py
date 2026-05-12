@@ -96,6 +96,9 @@ def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
         "signal_direction": payload.get("signal_direction"),
         "signal_level": payload.get("signal_level"),
         "score_reason": payload.get("score_reason"),
+        "risk_note": payload.get("risk_note"),
+        "position_60d": payload.get("position_60d"),
+        "volume_ratio": payload.get("volume_ratio"),
         "updated_at": row["updated_at"],
     }
 

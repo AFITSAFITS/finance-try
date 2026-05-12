@@ -159,7 +159,7 @@ python scripts/get_stock_data.py daily-signals --codes-file codes.txt --lookback
 python scripts/get_stock_data.py daily-signals --codes-file codes.txt --min-score 60
 ```
 
-扫描结果会带 `信号评分`、`信号方向`、`信号级别` 和 `评分原因`，可以用 `--min-score` 只保留更值得观察的信号。
+扫描结果会带 `信号评分`、`信号方向`、`信号级别`、`评分原因`、`风险提示`、`60日位置` 和 `量能比`，可以用 `--min-score` 只保留更值得观察的信号。
 日线信号入库后会同步保存评分信息，复盘统计会按评分区间汇总，方便观察高分信号后续表现是否更稳定。
 默认会限制单个行情源的最长等待时间，避免某个外部数据源卡住整批扫描。可以用 `AI_FINANCE_PROVIDER_TIMEOUT_SECONDS` 调整，默认 12 秒。
 日线扫描会复用当天已抓取的本地 K 线缓存；缓存不足时才重新请求外部行情源。
@@ -454,6 +454,7 @@ python scripts/run_scan_worker.py --run-once --channel feishu_webhook
 - 日线 K 线当前会按 东方财富 / AkShare / 腾讯 / 新浪 / BaoStock / Yahoo 的顺序尝试兜底
 - 单个行情源默认最多等待 12 秒，超时会继续尝试下一个来源
 - 日线扫描会复用当天本地 K 线缓存，但隔天仍会重新刷新数据
+- 日线评分会参考价格位置和量能，接近 60 日高位或量能不足时会提示风险
 - 涨停池和板块数据同样依赖公网数据源，结果适合做候选和观察，不等同于交易建议
 - SQLite 适合单机部署，不适合高并发多实例写入
 - 飞书通知依赖你自己提供有效 webhook；如果地址或签名不对，消息不会发出去

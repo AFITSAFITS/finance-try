@@ -37,6 +37,9 @@ def _signal_payload(row: dict[str, object]) -> dict[str, object]:
         "signal_direction": row.get("信号方向"),
         "signal_level": row.get("信号级别"),
         "score_reason": row.get("评分原因"),
+        "risk_note": row.get("风险提示"),
+        "position_60d": _clean_number(row.get("60日位置")),
+        "volume_ratio": _clean_number(row.get("量能比")),
     }
 
 

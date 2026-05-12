@@ -13,7 +13,11 @@ def make_history(code: str, closes: list[float]) -> pd.DataFrame:
         {
             "日期": pd.date_range("2026-03-01", periods=len(closes), freq="D"),
             "股票代码": [code] * len(closes),
+            "开盘": closes,
             "收盘": closes,
+            "最高": closes,
+            "最低": closes,
+            "成交量": [1000.0] * len(closes),
             "涨跌幅": [0.0] * len(closes),
         }
     )
@@ -45,6 +49,9 @@ def test_scan_stock_signal_events_detects_latest_crosses() -> None:
     assert up_row["信号"] == "MACD金叉, MA5上穿MA20"
     assert up_row["信号评分"] >= 80
     assert up_row["信号方向"] == "偏多"
+    assert up_row["60日位置"] == 1.0
+    assert up_row["量能比"] == 1.0
+    assert "接近60日高位" in up_row["风险提示"]
 
     down_row = df[df["股票代码"] == "600002"].iloc[0]
     assert down_row["MACD信号"] == "MACD死叉"
@@ -52,6 +59,33 @@ def test_scan_stock_signal_events_detects_latest_crosses() -> None:
     assert down_row["信号"] == "MACD死叉, MA5下穿MA20"
     assert down_row["信号评分"] <= 30
     assert down_row["信号方向"] == "偏空"
+
+
+def test_score_signal_row_accounts_for_position_and_volume() -> None:
+    strong_row = signal_service.score_signal_row(
+        {
+            "MACD信号": "MACD金叉",
+            "均线信号": "MA5上穿MA20",
+            "涨跌幅": 2.0,
+            "60日位置": 0.35,
+            "量能比": 1.8,
+        }
+    )
+    high_weak_row = signal_service.score_signal_row(
+        {
+            "MACD信号": "MACD金叉",
+            "均线信号": "MA5上穿MA20",
+            "涨跌幅": 2.0,
+            "60日位置": 0.95,
+            "量能比": 0.5,
+        }
+    )
+
+    assert strong_row["信号评分"] > high_weak_row["信号评分"]
+    assert "价格位置不高" in strong_row["评分原因"]
+    assert "量能放大" in strong_row["评分原因"]
+    assert "接近60日高位" in high_weak_row["风险提示"]
+    assert "量能不足" in high_weak_row["风险提示"]
 
 
 def test_scan_stock_signal_events_collects_fetch_errors() -> None:

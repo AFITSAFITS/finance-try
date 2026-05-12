@@ -37,6 +37,9 @@ SIGNAL_OUTPUT_COLUMNS = [
     "MACD形态",
     "MA5",
     "MA20",
+    "60日位置",
+    "量能比",
+    "风险提示",
     "均线信号",
     "信号",
 ]
@@ -96,10 +99,10 @@ def normalize_history_df(df: pd.DataFrame, code: str) -> pd.DataFrame:
 
     normalized = df.copy()
     normalized["日期"] = pd.to_datetime(normalized["日期"], errors="coerce")
-    normalized["收盘"] = pd.to_numeric(normalized["收盘"], errors="coerce")
-    if "涨跌幅" in normalized.columns:
-        normalized["涨跌幅"] = pd.to_numeric(normalized["涨跌幅"], errors="coerce")
-    else:
+    for column in ["开盘", "收盘", "最高", "最低", "成交量", "成交额", "涨跌幅", "换手率"]:
+        if column in normalized.columns:
+            normalized[column] = pd.to_numeric(normalized[column], errors="coerce")
+    if "涨跌幅" not in normalized.columns:
         normalized["涨跌幅"] = None
     if "股票代码" not in normalized.columns:
         normalized["股票代码"] = code
@@ -124,6 +127,16 @@ def add_indicator_columns(df: pd.DataFrame) -> pd.DataFrame:
         enriched["MA5"] = enriched["收盘"].rolling(window=5).mean()
     if "MA20" not in enriched.columns:
         enriched["MA20"] = enriched["收盘"].rolling(window=20).mean()
+    if "成交量" in enriched.columns and "VOL20" not in enriched.columns:
+        enriched["VOL20"] = enriched["成交量"].rolling(window=20).mean()
+    if "最高" in enriched.columns and "最低" in enriched.columns:
+        rolling_high = enriched["最高"].rolling(window=60, min_periods=20).max()
+        rolling_low = enriched["最低"].rolling(window=60, min_periods=20).min()
+    else:
+        rolling_high = enriched["收盘"].rolling(window=60, min_periods=20).max()
+        rolling_low = enriched["收盘"].rolling(window=60, min_periods=20).min()
+    price_range = rolling_high - rolling_low
+    enriched["POSITION_60D"] = (enriched["收盘"] - rolling_low) / price_range.where(price_range != 0)
     return enriched
 
 
@@ -169,12 +182,15 @@ def detect_macd_secondary_golden_cross_above_zero(enriched_df: pd.DataFrame) -> 
 def score_signal_row(row: dict[str, object]) -> dict[str, object]:
     score = 50.0
     reasons: list[str] = []
+    risks: list[str] = []
     direction = "中性"
 
     macd_signal = str(row.get("MACD信号") or "")
     ma_signal = str(row.get("均线信号") or "")
     macd_pattern = str(row.get("MACD形态") or "")
     pct_change = row.get("涨跌幅")
+    position_60d = row.get("60日位置")
+    volume_ratio = row.get("量能比")
 
     if macd_signal == "MACD金叉":
         score += 20
@@ -206,13 +222,40 @@ def score_signal_row(row: dict[str, object]) -> dict[str, object]:
     if direction == "偏多":
         if pct >= 7:
             score -= 10
-            reasons.append("当日涨幅偏高")
+            risks.append("当日涨幅偏高")
         elif 0 <= pct <= 5:
             score += 5
             reasons.append("涨幅未明显过热")
     elif direction == "偏空" and pct <= -5:
         score -= 5
-        reasons.append("跌幅偏大")
+        risks.append("跌幅偏大")
+
+    try:
+        position = float(position_60d)
+    except (TypeError, ValueError):
+        position = float("nan")
+    if not pd.isna(position):
+        if direction == "偏多":
+            if position >= 0.9:
+                score -= 10
+                risks.append("接近60日高位")
+            elif position <= 0.45:
+                score += 5
+                reasons.append("价格位置不高")
+        elif direction == "偏空" and position <= 0.2:
+            risks.append("接近60日低位")
+
+    try:
+        ratio = float(volume_ratio)
+    except (TypeError, ValueError):
+        ratio = float("nan")
+    if not pd.isna(ratio) and direction == "偏多":
+        if ratio >= 1.5:
+            score += 5
+            reasons.append("量能放大")
+        elif ratio < 0.7:
+            score -= 5
+            risks.append("量能不足")
 
     bounded_score = max(0.0, min(100.0, score))
     if bounded_score >= 80:
@@ -229,6 +272,7 @@ def score_signal_row(row: dict[str, object]) -> dict[str, object]:
         "信号方向": direction,
         "信号级别": level,
         "评分原因": "；".join(reasons),
+        "风险提示": "；".join(risks) if risks else "无明显风险",
     }
 
 
@@ -272,6 +316,10 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
         "MACD形态": macd_pattern,
         "MA5": None if pd.isna(curr_row["MA5"]) else round(float(curr_row["MA5"]), 4),
         "MA20": None if pd.isna(curr_row["MA20"]) else round(float(curr_row["MA20"]), 4),
+        "60日位置": None if pd.isna(curr_row["POSITION_60D"]) else round(float(curr_row["POSITION_60D"]), 4),
+        "量能比": None
+        if "VOL20" not in curr_row or pd.isna(curr_row["VOL20"]) or pd.isna(curr_row.get("成交量")) or float(curr_row["VOL20"]) == 0
+        else round(float(curr_row["成交量"]) / float(curr_row["VOL20"]), 4),
         "均线信号": ma_signal,
         "信号": ", ".join(signals),
     }
