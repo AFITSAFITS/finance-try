@@ -1340,6 +1340,18 @@ def main() -> None:
                     f"现在需要复盘={review_backlog.get('review_now', False)} | "
                     f"覆盖率={review_backlog.get('reviewed_ratio')}"
                 )
+                due_review_df = pd.DataFrame(review_backlog.get("due_missing_items", []))
+                if not due_review_df.empty:
+                    due_cols = [
+                        "strategy_type",
+                        "trade_date",
+                        "review_due_date",
+                        "code",
+                        "name",
+                        "summary",
+                        "score",
+                    ]
+                    st.dataframe(due_review_df[[c for c in due_cols if c in due_review_df.columns]], use_container_width=True)
             strategy_df = pd.DataFrame(data.get("items", []))
             if strategy_df.empty:
                 st.warning("当前还没有可展示的策略结论。请先回填复盘结果。")

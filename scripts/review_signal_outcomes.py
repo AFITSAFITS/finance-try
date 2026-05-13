@@ -219,6 +219,16 @@ def main() -> int:
                 f"review_now={review_backlog.get('review_now', False)} | "
                 f"reviewed_ratio={review_backlog.get('reviewed_ratio')}"
             )
+            for due_item in review_backlog.get("due_missing_items", []):
+                print(
+                    f"review_due type={due_item.get('strategy_type', '')} | "
+                    f"trade_date={due_item.get('trade_date', '')} | "
+                    f"due_date={due_item.get('review_due_date', '')} | "
+                    f"code={due_item.get('code', '')} | "
+                    f"name={due_item.get('name', '')} | "
+                    f"summary={due_item.get('summary', '')} | "
+                    f"score={due_item.get('score', '')}"
+                )
         items = strategy_summary.get("items", [])
         if not items:
             print("没有可用的统一策略结论。")

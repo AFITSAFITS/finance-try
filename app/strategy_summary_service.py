@@ -152,6 +152,39 @@ def _build_sample_gap_summary(items: list[dict[str, Any]], limit: int = 3) -> di
     }
 
 
+def _add_due_dates(items: list[dict[str, Any]], horizon: str) -> list[dict[str, Any]]:
+    return [
+        {
+            **dict(item),
+            "review_due_date": _review_due_date(str(item.get("trade_date", "")), horizon),
+        }
+        for item in items
+    ]
+
+
+def _combine_due_missing_items(
+    signal_backlog: dict[str, Any],
+    limit_up_backlog: dict[str, Any],
+    limit: int,
+) -> list[dict[str, Any]]:
+    items = [
+        {"strategy_type": "日线信号", **item}
+        for item in signal_backlog.get("due_missing_items", [])
+    ] + [
+        {"strategy_type": "涨停策略", **item}
+        for item in limit_up_backlog.get("due_missing_items", [])
+    ]
+    items.sort(
+        key=lambda item: (
+            str(item.get("review_due_date", "")),
+            str(item.get("trade_date", "")),
+            str(item.get("strategy_type", "")),
+            str(item.get("code", "")),
+        )
+    )
+    return items[: max(1, int(limit))]
+
+
 def _build_where(
     date_column: str,
     code_column: str,
@@ -205,6 +238,19 @@ def _summarize_signal_review_backlog(
             """,
             (horizon, *params, max(1, int(limit))),
         ).fetchall()
+        due_missing_rows = conn.execute(
+            f"""
+            SELECT e.trade_date, e.code, e.summary
+            FROM signal_events e
+            {join_sql}
+            {where_sql}
+              {"AND" if where_sql else "WHERE"} r.id IS NULL
+              AND e.trade_date <= ?
+            ORDER BY e.trade_date ASC, e.code ASC, e.id ASC
+            LIMIT ?
+            """,
+            (horizon, *params, due_cutoff, max(1, int(limit))),
+        ).fetchall()
         next_due_row = conn.execute(
             f"""
             SELECT e.trade_date
@@ -233,7 +279,8 @@ def _summarize_signal_review_backlog(
         "next_due_date": _review_due_date(next_due_row["trade_date"], horizon) if next_due_row else "",
         "review_now": due_missing > 0,
         "reviewed_ratio": round(reviewed / total, 4) if total else None,
-        "latest_missing": [dict(item) for item in missing_rows],
+        "latest_missing": _add_due_dates([dict(item) for item in missing_rows], horizon),
+        "due_missing_items": _add_due_dates([dict(item) for item in due_missing_rows], horizon),
     }
 
 
@@ -278,6 +325,19 @@ def _summarize_limit_up_review_backlog(
             """,
             (horizon, *params, max(1, int(limit))),
         ).fetchall()
+        due_missing_rows = conn.execute(
+            f"""
+            SELECT c.trade_date, c.code, c.name, c.score
+            FROM limit_up_candidates c
+            {join_sql}
+            {where_sql}
+              {"AND" if where_sql else "WHERE"} r.id IS NULL
+              AND c.trade_date <= ?
+            ORDER BY c.trade_date ASC, c.score DESC, c.code ASC, c.id ASC
+            LIMIT ?
+            """,
+            (horizon, *params, due_cutoff, max(1, int(limit))),
+        ).fetchall()
         next_due_row = conn.execute(
             f"""
             SELECT c.trade_date
@@ -306,7 +366,8 @@ def _summarize_limit_up_review_backlog(
         "next_due_date": _review_due_date(next_due_row["trade_date"], horizon) if next_due_row else "",
         "review_now": due_missing > 0,
         "reviewed_ratio": round(reviewed / total, 4) if total else None,
-        "latest_missing": [dict(item) for item in missing_rows],
+        "latest_missing": _add_due_dates([dict(item) for item in missing_rows], horizon),
+        "due_missing_items": _add_due_dates([dict(item) for item in due_missing_rows], horizon),
     }
 
 
@@ -339,6 +400,7 @@ def summarize_review_backlog(
         "next_due_date": min(next_due_dates) if next_due_dates else "",
         "review_now": due_missing_count > 0,
         "reviewed_ratio": round(reviewed_count / total_count, 4) if total_count else None,
+        "due_missing_items": _combine_due_missing_items(signal_backlog, limit_up_backlog, limit),
         "signals": signal_backlog,
         "limit_up": limit_up_backlog,
     }

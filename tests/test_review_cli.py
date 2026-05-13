@@ -155,6 +155,15 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
                 "next_due_date": "2026-05-15",
                 "review_now": True,
                 "reviewed_ratio": 0.3333,
+                "due_missing_items": [
+                    {
+                        "strategy_type": "日线信号",
+                        "trade_date": "2026-05-01",
+                        "review_due_date": "2026-05-04",
+                        "code": "300001",
+                        "summary": "MACD金叉",
+                    }
+                ],
             },
             "items": [
                 {
@@ -216,6 +225,9 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     assert "not_due=1" in captured.out
     assert "next_due_date=2026-05-15" in captured.out
     assert "review_now=True" in captured.out
+    assert "review_due type=日线信号" in captured.out
+    assert "due_date=2026-05-04" in captured.out
+    assert "code=300001" in captured.out
     assert "type=日线信号" in captured.out
     assert "next_action=保留该分组" in captured.out
     assert "verdict=保留" in captured.out

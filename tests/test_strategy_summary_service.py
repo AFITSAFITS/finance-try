@@ -262,14 +262,25 @@ def test_summarize_review_backlog_counts_missing_snapshots(monkeypatch, tmp_path
     assert result["not_due_count"] == 1
     assert result["next_due_date"] == "2026-05-15"
     assert result["review_now"] is True
+    assert result["due_missing_items"][0]["strategy_type"] == "涨停策略"
+    assert result["due_missing_items"][0]["code"] == "300003"
+    assert result["due_missing_items"][0]["review_due_date"] == "2026-05-04"
+    assert result["due_missing_items"][1]["strategy_type"] == "日线信号"
+    assert result["due_missing_items"][1]["code"] == "300002"
+    assert result["due_missing_items"][1]["review_due_date"] == "2026-05-05"
     assert result["reviewed_ratio"] == 0.25
     assert result["signals"]["missing_count"] == 2
     assert result["signals"]["due_missing_count"] == 1
     assert result["signals"]["not_due_count"] == 1
     assert result["signals"]["next_due_date"] == "2026-05-15"
     assert result["signals"]["review_now"] is True
+    assert result["signals"]["due_missing_items"][0]["code"] == "300002"
+    assert result["signals"]["due_missing_items"][0]["review_due_date"] == "2026-05-05"
     assert result["limit_up"]["missing_count"] == 1
     assert result["limit_up"]["due_missing_count"] == 1
     assert result["limit_up"]["next_due_date"] == ""
     assert result["limit_up"]["review_now"] is True
+    assert result["limit_up"]["due_missing_items"][0]["code"] == "300003"
+    assert result["limit_up"]["due_missing_items"][0]["review_due_date"] == "2026-05-04"
     assert result["signals"]["latest_missing"][0]["code"] == "300004"
+    assert result["signals"]["latest_missing"][0]["review_due_date"] == "2026-05-15"
