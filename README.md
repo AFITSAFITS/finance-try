@@ -205,7 +205,10 @@ python scripts/run_daily_scan.py --review-after-scan --review-summary-horizon T+
 python scripts/run_scan_worker.py
 python scripts/run_scan_worker.py --run-once --channel feishu_webhook
 python scripts/run_scan_worker.py --run-once --min-score 60
+python scripts/run_scan_worker.py --run-once --review-after-scan
 ```
+
+常驻任务也支持扫描后复盘；部署时可以设置 `AI_FINANCE_REVIEW_AFTER_SCAN=true`，并用 `AI_FINANCE_REVIEW_HORIZONS` 和 `AI_FINANCE_REVIEW_SUMMARY_HORIZON` 控制复盘周期。
 
 ### 实时行情快照
 

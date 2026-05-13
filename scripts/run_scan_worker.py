@@ -13,6 +13,18 @@ if str(ROOT_DIR) not in sys.path:
 from app import worker_service
 
 
+def env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def parse_horizon_args(raw: str) -> list[int]:
+    values = [item.strip() for item in raw.split(",") if item.strip()]
+    return [int(item) for item in values]
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the scheduled scan worker.")
     parser.add_argument("--channel", type=str, default=os.getenv("AI_FINANCE_NOTIFICATION_CHANNEL", "stdout"))
@@ -20,6 +32,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--adjust", type=str, default=os.getenv("AI_FINANCE_ADJUST", "qfq"))
     parser.add_argument("--max-workers", type=int, default=int(os.getenv("AI_FINANCE_MAX_WORKERS", "8")))
     parser.add_argument("--min-score", type=float, default=float(os.getenv("AI_FINANCE_DAILY_MIN_SCORE", "60")))
+    parser.add_argument(
+        "--review-after-scan",
+        action="store_true",
+        default=env_flag("AI_FINANCE_REVIEW_AFTER_SCAN", False),
+        help="Backfill signal review snapshots after each worker scan",
+    )
+    parser.add_argument(
+        "--review-trade-date",
+        type=str,
+        default=os.getenv("AI_FINANCE_REVIEW_TRADE_DATE", ""),
+        help="Optional trade date filter for worker review backfill",
+    )
+    parser.add_argument(
+        "--review-horizons",
+        type=str,
+        default=os.getenv("AI_FINANCE_REVIEW_HORIZONS", "1,3,5"),
+        help="Comma-separated review horizons for --review-after-scan",
+    )
+    parser.add_argument(
+        "--review-summary-horizon",
+        type=str,
+        default=os.getenv("AI_FINANCE_REVIEW_SUMMARY_HORIZON", "T+3"),
+        help="Summary horizon label after review backfill",
+    )
     parser.add_argument(
         "--schedule-time",
         type=str,
@@ -51,6 +87,10 @@ def main() -> int:
                 adjust=args.adjust,
                 max_workers=int(args.max_workers),
                 min_score=float(args.min_score),
+                review_after_scan=bool(args.review_after_scan),
+                review_trade_date=args.review_trade_date,
+                review_horizons=parse_horizon_args(args.review_horizons),
+                review_summary_horizon=args.review_summary_horizon,
             )
             print(
                 f"watchlist={result['watchlist'].get('name', '')} "
@@ -60,6 +100,14 @@ def main() -> int:
                 f"notification_events={len(result.get('notification_events', []))} "
                 f"errors={len(result.get('errors', []))}"
             )
+            if args.review_after_scan:
+                review_result = result.get("review_result") or {}
+                review_stats = result.get("review_stats") or []
+                print(
+                    f"review_snapshots={review_result.get('count', 0)} "
+                    f"review_stats={len(review_stats)} "
+                    f"review_error={result.get('review_error', '')}"
+                )
             return 0
 
         worker_service.run_worker_loop(
@@ -68,6 +116,10 @@ def main() -> int:
             adjust=args.adjust,
             max_workers=int(args.max_workers),
             min_score=float(args.min_score),
+            review_after_scan=bool(args.review_after_scan),
+            review_trade_date=args.review_trade_date,
+            review_horizons=parse_horizon_args(args.review_horizons),
+            review_summary_horizon=args.review_summary_horizon,
             schedule_time=args.schedule_time,
             timezone_name=args.timezone,
             poll_seconds=int(args.poll_seconds),

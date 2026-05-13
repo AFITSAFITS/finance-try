@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from app import review_service
 from app import scan_workflow
 
 
@@ -43,14 +44,37 @@ def run_single_scan_job(
     adjust: str = "qfq",
     max_workers: int = 8,
     min_score: float = 60.0,
+    review_after_scan: bool = False,
+    review_trade_date: str = "",
+    review_horizons: list[int] | tuple[int, ...] | None = None,
+    review_summary_horizon: str = "T+3",
 ) -> dict[str, Any]:
-    return scan_workflow.run_default_watchlist_scan(
+    result = scan_workflow.run_default_watchlist_scan(
         lookback_days=int(lookback_days),
         adjust=adjust,
         channel=channel,
         max_workers=int(max_workers),
         min_score=float(min_score),
     )
+    if not review_after_scan:
+        return result
+
+    try:
+        selected_horizons = review_service.parse_horizons(review_horizons)
+        review_result = review_service.backfill_review_snapshots(
+            trade_date=review_trade_date.strip() or None,
+            horizons=selected_horizons,
+            adjust=adjust,
+        )
+        review_stats = review_service.summarize_review_stats(
+            horizon=review_summary_horizon.strip() or "T+3",
+            trade_date=review_trade_date.strip() or None,
+        )
+        result["review_result"] = review_result
+        result["review_stats"] = review_stats
+    except Exception as exc:  # noqa: BLE001
+        result["review_error"] = str(exc)
+    return result
 
 
 def run_worker_loop(
@@ -59,6 +83,10 @@ def run_worker_loop(
     adjust: str = "qfq",
     max_workers: int = 8,
     min_score: float = 60.0,
+    review_after_scan: bool = False,
+    review_trade_date: str = "",
+    review_horizons: list[int] | tuple[int, ...] | None = None,
+    review_summary_horizon: str = "T+3",
     schedule_time: str = "15:05",
     timezone_name: str = "Asia/Shanghai",
     poll_seconds: int = 30,
@@ -75,9 +103,15 @@ def run_worker_loop(
                 adjust=adjust,
                 max_workers=int(max_workers),
                 min_score=float(min_score),
+                review_after_scan=review_after_scan,
+                review_trade_date=review_trade_date,
+                review_horizons=review_horizons,
+                review_summary_horizon=review_summary_horizon,
             )
             last_run_date = now.strftime("%Y-%m-%d")
             summary = result.get("signal_summary", {})
+            review_result = result.get("review_result") or {}
+            review_stats = result.get("review_stats") or []
             print(
                 f"[worker] trade_date={last_run_date} "
                 f"watchlist={result['watchlist'].get('name', '')} "
@@ -88,6 +122,9 @@ def run_worker_loop(
                 f"status={(result.get('scan_run') or {}).get('status', '')} "
                 f"min_score={result.get('min_score', '')} "
                 f"stale_signals={summary.get('stale_signals', 0) if isinstance(summary, dict) else 0} "
-                f"errors={len(result.get('errors', []))}"
+                f"errors={len(result.get('errors', []))} "
+                f"review_snapshots={review_result.get('count', '') if review_after_scan else ''} "
+                f"review_stats={len(review_stats) if review_after_scan else ''} "
+                f"review_error={result.get('review_error', '') if review_after_scan else ''}"
             )
         time.sleep(max(1, int(poll_seconds)))
