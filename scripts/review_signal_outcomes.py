@@ -27,6 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trade-date", type=str, default="", help="Filter signal events by trade date")
     parser.add_argument("--code", type=str, default="", help="Filter signal events by stock code")
     parser.add_argument("--horizons", type=str, default="1,3,5", help="Comma-separated trading-day horizons")
+    parser.add_argument("--due-only", action="store_true", help="Only backfill review snapshots whose horizon is due")
     parser.add_argument("--adjust", type=str, default="qfq", help="qfq / hfq / empty string")
     parser.add_argument("--summary-horizon", type=str, default="T+3", help="Summary horizon label, e.g. T+3")
     parser.add_argument(
@@ -82,6 +83,7 @@ def main() -> int:
                     code=args.code.strip() or None,
                     horizons=selected_horizons,
                     adjust=args.adjust,
+                    due_only=bool(args.due_only),
                 )
             signal_stats = review_service.summarize_review_stats(
                 horizon=args.summary_horizon.strip() or "T+3",
@@ -96,6 +98,7 @@ def main() -> int:
                     code=args.code.strip() or None,
                     horizons=selected_horizons,
                     adjust=args.adjust,
+                    due_only=bool(args.due_only),
                 )
             limit_stats = limit_up_service.summarize_limit_up_review_stats(
                 horizon=args.summary_horizon.strip() or "T+3",

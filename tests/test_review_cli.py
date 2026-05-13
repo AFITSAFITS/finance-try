@@ -103,6 +103,39 @@ def test_review_cli_stats_only_skips_limit_up_backfill(monkeypatch, capsys) -> N
     assert "limit_up_review_snapshots=skipped" in captured.out
 
 
+def test_review_cli_passes_due_only_to_backfill(monkeypatch, capsys) -> None:
+    module = load_module()
+    called = {"signals": False, "limit_up": False}
+
+    def fake_backfill_review_snapshots(**kwargs):
+        called["signals"] = True
+        assert kwargs["due_only"] is True
+        assert kwargs["horizons"] == [1, 3]
+        return {"count": 0, "items": [], "errors": []}
+
+    def fake_backfill_limit_up_review_snapshots(**kwargs):
+        called["limit_up"] = True
+        assert kwargs["due_only"] is True
+        assert kwargs["horizons"] == [1, 3]
+        return {"count": 0, "items": [], "errors": []}
+
+    monkeypatch.setattr(module.review_service, "backfill_review_snapshots", fake_backfill_review_snapshots)
+    monkeypatch.setattr(module.limit_up_service, "backfill_limit_up_review_snapshots", fake_backfill_limit_up_review_snapshots)
+    monkeypatch.setattr(module.review_service, "summarize_review_stats", lambda **kwargs: [])
+    monkeypatch.setattr(module.limit_up_service, "summarize_limit_up_review_stats", lambda **kwargs: [])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [str(REVIEW_SCRIPT), "--target", "both", "--horizons", "1,3", "--due-only"],
+    )
+
+    assert module.main() == 0
+    captured = capsys.readouterr()
+    assert called == {"signals": True, "limit_up": True}
+    assert "review_snapshots=0" in captured.out
+    assert "limit_up_review_snapshots=0" in captured.out
+
+
 def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     module = load_module()
     called = {"strategy": False}

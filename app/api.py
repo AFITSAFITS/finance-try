@@ -92,6 +92,7 @@ class BackfillReviewsRequest(BaseModel):
     code: str = ""
     horizons: list[int] = Field(default_factory=lambda: [1, 3, 5])
     adjust: str = "qfq"
+    due_only: bool = False
 
 
 class LimitUpBreakthroughRequest(BaseModel):
@@ -107,6 +108,7 @@ class LimitUpReviewRequest(BaseModel):
     code: str = ""
     horizons: list[int] = Field(default_factory=lambda: [1, 3, 5])
     adjust: str = "qfq"
+    due_only: bool = False
 
 
 class SectorRotationRequest(BaseModel):
@@ -535,6 +537,7 @@ def api_backfill_reviews(req: BackfillReviewsRequest) -> dict[str, Any]:
             code=req.code.strip() or None,
             horizons=req.horizons,
             adjust=req.adjust.strip(),
+            due_only=bool(req.due_only),
         )
         return {
             "as_of": tdx_service.now_ts(),
@@ -674,6 +677,7 @@ def api_backfill_limit_up_reviews(req: LimitUpReviewRequest) -> dict[str, Any]:
             code=req.code.strip() or None,
             horizons=req.horizons,
             adjust=req.adjust.strip(),
+            due_only=bool(req.due_only),
         )
         return {
             "as_of": tdx_service.now_ts(),

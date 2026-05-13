@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable
 
 import pandas as pd
@@ -406,6 +406,11 @@ def parse_horizons(values: list[int] | tuple[int, ...] | None) -> list[int]:
     return normalized or [1, 3, 5]
 
 
+def _is_horizon_due(trade_date: str, horizon_days: int) -> bool:
+    due_date = datetime.strptime(str(trade_date), "%Y-%m-%d") + timedelta(days=int(horizon_days))
+    return due_date.strftime("%Y-%m-%d") <= datetime.now().strftime("%Y-%m-%d")
+
+
 def horizon_label(days: int) -> str:
     return f"T+{int(days)}"
 
@@ -518,10 +523,17 @@ def backfill_limit_up_review_snapshots(
     code: str | None = None,
     horizons: list[int] | tuple[int, ...] | None = None,
     adjust: str = "qfq",
+    due_only: bool = False,
     fetcher: Callable[[str, str, str, str], pd.DataFrame] = fetch_daily_history_range_with_cache,
 ) -> dict[str, Any]:
     selected_horizons = parse_horizons(horizons)
     candidates = _load_limit_up_candidates(trade_date=trade_date, code=code)
+    if due_only:
+        candidates = [
+            candidate
+            for candidate in candidates
+            if any(_is_horizon_due(str(candidate["trade_date"]), horizon_days) for horizon_days in selected_horizons)
+        ]
     if not candidates:
         return {"count": 0, "items": [], "errors": []}
 
@@ -561,6 +573,8 @@ def backfill_limit_up_review_snapshots(
                     else float(indexed.iloc[base_index]["收盘"])
                 )
                 for horizon_days in selected_horizons:
+                    if due_only and not _is_horizon_due(candidate_date, horizon_days):
+                        continue
                     future_index = base_index + int(horizon_days)
                     if future_index >= len(indexed.index):
                         continue

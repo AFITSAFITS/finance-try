@@ -223,6 +223,7 @@ python scripts/get_stock_data.py realtime-quotes --codes 600519,000001
 
 ```bash
 python scripts/review_signal_outcomes.py
+python scripts/review_signal_outcomes.py --target both --due-only --horizons 1,3,5
 python scripts/review_signal_outcomes.py --trade-date 2026-04-08 --summary-horizon T+3
 python scripts/review_signal_outcomes.py --target limit-up --trade-date 2026-05-12 --summary-horizon T+3
 python scripts/review_signal_outcomes.py --stats-only --summary-horizon T+3
@@ -233,7 +234,7 @@ python scripts/review_signal_outcomes.py --stats-only --strategy-json --strategy
 python scripts/review_signal_outcomes.py --stats-only --strategy-summary --strategy-require-actionable
 ```
 
-`--stats-only` 只读取已经保存的复盘结果，不会重新请求外部行情源，适合日常快速查看统计。正常回填复盘时会优先复用本地 K 线缓存，缓存不足时再请求外部行情源。
+`--stats-only` 只读取已经保存的复盘结果，不会重新请求外部行情源，适合日常快速查看统计。正常回填复盘时会优先复用本地 K 线缓存，缓存不足时再请求外部行情源。日常补复盘建议加 `--due-only`，只处理已经到期的 T+1 / T+3 / T+5 样本。
 日线复盘统计会同时按评分区间、信号方向、观察结论、数据时效、数据来源、风险提示和止损距离分层，并展示平均 60 日位置、平均量能比、平均止损距离、平均风险收益比、止损触发率、目标触发率、止损先到率、目标先到率、策略结论、下一步动作、结论可信度和距离可行动还差的样本数，便于判断哪些信号应该继续保留、观察或降权。
 页面里的 `策略结论` 会把日线信号和涨停策略的复盘统计合在一起，优先展示可执行的保留、降权和观察结论；命令行也可以用 `--strategy-summary` 快速查看同一套结论，并用 `--strategy-actionable-only`、`--strategy-min-samples` 和 `--strategy-data-source` 过滤低样本或指定数据来源。样本不足时会显示还差多少样本才进入可行动区间，并给出继续积累、保留、降权或继续观察的下一步动作；汇总结果也会展示策略类型分布、数据来源分布、下一步动作分布、样本缺口和复盘缺口，并区分已到期未复盘与尚未到期的样本，给出下一次可复盘日期、当前是否需要复盘和已到期复盘清单，便于优先补齐最接近可判断但还没复盘的策略分组。需要接入其他自动化流程时，可以用 `--strategy-json` 输出结构化结果，也可以用 `--strategy-require-actionable` 在过滤后没有可行动结论时返回非 0 状态。
 
@@ -362,6 +363,7 @@ curl -X POST http://127.0.0.1:8000/api/limit-up/reviews/backfill \
   -d '{
     "trade_date": "2026-05-12",
     "horizons": [1, 3, 5],
+    "due_only": true,
     "adjust": "qfq"
   }'
 ```

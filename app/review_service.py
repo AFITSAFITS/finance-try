@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from typing import Any, Callable, Iterable
 
@@ -24,6 +24,11 @@ def parse_horizons(values: Iterable[int] | None) -> list[int]:
     raw_values = list(values or DEFAULT_HORIZONS)
     normalized = sorted({int(value) for value in raw_values if int(value) > 0})
     return normalized or list(DEFAULT_HORIZONS)
+
+
+def _is_horizon_due(trade_date: str, horizon_days: int) -> bool:
+    due_date = datetime.strptime(str(trade_date), "%Y-%m-%d") + timedelta(days=int(horizon_days))
+    return due_date.strftime("%Y-%m-%d") <= datetime.now().strftime("%Y-%m-%d")
 
 
 def _load_signal_events(
@@ -244,10 +249,17 @@ def backfill_review_snapshots(
     code: str | None = None,
     horizons: Iterable[int] | None = None,
     adjust: str = "qfq",
+    due_only: bool = False,
     fetcher: Callable[[str, str, str, str], pd.DataFrame] = bar_service.fetch_daily_history_range_cached,
 ) -> dict[str, Any]:
     selected_horizons = parse_horizons(horizons)
     events = _load_signal_events(trade_date=trade_date, code=code)
+    if due_only:
+        events = [
+            event
+            for event in events
+            if any(_is_horizon_due(str(event["trade_date"]), horizon_days) for horizon_days in selected_horizons)
+        ]
     if not events:
         return {"count": 0, "items": [], "errors": []}
 
@@ -284,6 +296,8 @@ def backfill_review_snapshots(
 
                     base_close = float(event["close_price"]) if event.get("close_price") is not None else float(indexed.iloc[base_index]["收盘"])
                     for horizon_days in selected_horizons:
+                        if due_only and not _is_horizon_due(event_date, horizon_days):
+                            continue
                         future_index = base_index + int(horizon_days)
                         if future_index >= len(indexed.index):
                             continue

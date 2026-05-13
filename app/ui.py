@@ -792,6 +792,7 @@ def main() -> None:
         c1, c2 = st.columns(2)
         review_horizon = c1.selectbox("复盘统计周期", options=["T+1", "T+3", "T+5"], index=1, key="limit_review_horizon")
         review_code = c2.text_input("股票代码过滤（可选）", value="", key="limit_review_code")
+        limit_due_only = st.checkbox("只回填已到期涨停候选", value=True, key="limit_review_due_only")
 
         if st.button("回填涨停候选复盘"):
             try:
@@ -803,6 +804,7 @@ def main() -> None:
                         "code": review_code.strip(),
                         "horizons": [1, 3, 5],
                         "adjust": "qfq",
+                        "due_only": limit_due_only,
                     },
                     timeout_seconds=900,
                 )
@@ -1137,6 +1139,7 @@ def main() -> None:
         review_code = c1.text_input("股票代码过滤（可选）", value="", key="review_code")
         review_date = c2.text_input("交易日过滤（可选）", value="", key="review_date")
         horizon = c3.selectbox("统计 horizon", options=["T+1", "T+3", "T+5"], index=1)
+        due_only = st.checkbox("只回填已到期信号", value=True, key="review_due_only")
 
         if st.button("回填复盘快照", type="primary"):
             payload = {
@@ -1144,6 +1147,7 @@ def main() -> None:
                 "trade_date": review_date.strip(),
                 "horizons": [1, 3, 5],
                 "adjust": "qfq",
+                "due_only": due_only,
             }
             try:
                 data = request_api(

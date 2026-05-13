@@ -612,6 +612,7 @@ def test_bootstrap_default_watchlist_api(monkeypatch, tmp_path) -> None:
 def test_review_backfill_api(monkeypatch) -> None:
     def fake_backfill_review_snapshots(**kwargs):
         assert kwargs["horizons"] == [1, 3, 5]
+        assert kwargs["due_only"] is True
         return {
             "count": 2,
             "items": [
@@ -632,7 +633,7 @@ def test_review_backfill_api(monkeypatch) -> None:
 
     resp = client.post(
         "/api/reviews/backfill",
-        json={"horizons": [1, 3, 5]},
+        json={"horizons": [1, 3, 5], "due_only": True},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -840,6 +841,7 @@ def test_limit_up_review_backfill_api(monkeypatch, tmp_path) -> None:
     def fake_backfill_limit_up_review_snapshots(**kwargs):
         assert kwargs["trade_date"] == "2026-05-12"
         assert kwargs["horizons"] == [1, 3, 5]
+        assert kwargs["due_only"] is True
         return {
             "count": 1,
             "items": [{"code": "600001", "horizon": "T+3", "pct_return": 12.5}],
@@ -854,7 +856,7 @@ def test_limit_up_review_backfill_api(monkeypatch, tmp_path) -> None:
 
     resp = client.post(
         "/api/limit-up/reviews/backfill",
-        json={"trade_date": "2026-05-12", "horizons": [1, 3, 5]},
+        json={"trade_date": "2026-05-12", "horizons": [1, 3, 5], "due_only": True},
     )
 
     assert resp.status_code == 200

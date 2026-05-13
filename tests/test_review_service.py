@@ -150,3 +150,56 @@ def test_backfill_review_snapshots_uses_cached_daily_bars(monkeypatch, tmp_path)
     assert result["errors"] == []
     assert result["count"] == 6
     assert next(item for item in result["items"] if item["horizon"] == "T+3")["pct_return"] == 20.0
+
+
+def test_backfill_review_snapshots_due_only_skips_not_due_horizons(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+
+    class FixedDatetime(review_service.datetime):
+        @classmethod
+        def now(cls):  # noqa: ANN102
+            return cls(2026, 5, 13)
+
+    monkeypatch.setattr(review_service, "datetime", FixedDatetime)
+    event_service.persist_signal_rows(
+        pd.DataFrame(
+            [
+                {
+                    "股票代码": "600519",
+                    "日期": "2026-05-12",
+                    "收盘": 10.0,
+                    "涨跌幅": 0.5,
+                    "DIF": 1.0,
+                    "DEA": 0.8,
+                    "MACD信号": "MACD金叉",
+                    "MA5": 10.0,
+                    "MA20": 9.8,
+                    "均线信号": "",
+                    "信号": "MACD金叉",
+                }
+            ]
+        )
+    )
+
+    def fake_fetcher(code: str, start_date: str, end_date: str, adjust: str = "qfq") -> pd.DataFrame:
+        assert start_date == "2026-05-12"
+        return pd.DataFrame(
+            {
+                "日期": pd.date_range("2026-05-12", periods=4, freq="D"),
+                "股票代码": [code] * 4,
+                "开盘": [10.0, 11.0, 12.0, 13.0],
+                "收盘": [10.0, 11.0, 12.0, 13.0],
+                "最高": [10.0, 11.0, 12.0, 13.0],
+                "最低": [10.0, 11.0, 12.0, 13.0],
+                "成交量": [1000] * 4,
+                "成交额": [10000] * 4,
+                "涨跌幅": [0.0] * 4,
+                "换手率": [1.0] * 4,
+            }
+        )
+
+    result = review_service.backfill_review_snapshots(horizons=[1, 3], due_only=True, fetcher=fake_fetcher)
+
+    assert result["errors"] == []
+    assert result["count"] == 1
+    assert result["items"][0]["horizon"] == "T+1"
