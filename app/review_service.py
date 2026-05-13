@@ -242,7 +242,7 @@ def backfill_review_snapshots(
     code: str | None = None,
     horizons: Iterable[int] | None = None,
     adjust: str = "qfq",
-    fetcher: Callable[[str, str, str, str], pd.DataFrame] = bar_service.fetch_daily_history_range_akshare,
+    fetcher: Callable[[str, str, str, str], pd.DataFrame] = bar_service.fetch_daily_history_range_cached,
 ) -> dict[str, Any]:
     selected_horizons = parse_horizons(horizons)
     events = _load_signal_events(trade_date=trade_date, code=code)

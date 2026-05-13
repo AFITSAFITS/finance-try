@@ -101,6 +101,31 @@ def fetch_daily_history_cached(
     return fetched
 
 
+def fetch_daily_history_range_cached(
+    code: str,
+    start_date: str,
+    end_date: str,
+    adjust: str = "qfq",
+) -> pd.DataFrame:
+    start = pd.to_datetime(start_date).strftime("%Y-%m-%d")
+    end = pd.to_datetime(end_date).strftime("%Y-%m-%d")
+    cached_rows = list_daily_bars_range(code, start, end, adjust=adjust)
+    if cached_rows:
+        return signal_service.normalize_history_df(
+            _cached_history_df(cached_rows, "本地缓存"),
+            code,
+        )
+
+    fetched = fetch_daily_history_range_akshare(code, start, end, adjust)
+    upsert_daily_bars(code, fetched, adjust=adjust)
+    fetched = signal_service.normalize_history_df(fetched, code)
+    if not fetched.empty:
+        fetched = fetched.copy()
+        fetched["数据来源"] = "外部行情源"
+        fetched["缓存获取时间"] = ""
+    return fetched
+
+
 def _to_number(row: pd.Series, column: str) -> float | None:
     value = row.get(column)
     if value is None or pd.isna(value):

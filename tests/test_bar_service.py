@@ -78,3 +78,25 @@ def test_fetch_daily_history_cached_raises_when_provider_fails_without_enough_ca
         assert "provider down" in str(exc)
     else:
         raise AssertionError("expected provider error without usable cache")
+
+
+def test_fetch_daily_history_range_cached_reuses_local_rows(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+    bar_service.upsert_daily_bars("600001", make_history("600001", rows=6))
+    calls = {"count": 0}
+
+    def fake_fetcher(code: str, start_date: str, end_date: str, adjust: str) -> pd.DataFrame:
+        calls["count"] += 1
+        raise RuntimeError("provider should not be called")
+
+    monkeypatch.setattr(bar_service, "fetch_daily_history_range_akshare", fake_fetcher)
+
+    cached = bar_service.fetch_daily_history_range_cached(
+        "600001",
+        "2026-04-20",
+        "2026-04-25",
+    )
+
+    assert calls["count"] == 0
+    assert len(cached) == 6
+    assert set(cached["数据来源"]) == {"本地缓存"}

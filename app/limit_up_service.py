@@ -437,25 +437,18 @@ def _load_limit_up_candidates(
     return [dict(row) for row in rows]
 
 
-def _cached_daily_bars_to_history_df(rows: list[dict[str, Any]]) -> pd.DataFrame:
-    return bar_service.cached_daily_bars_to_history_df(rows)
-
-
 def fetch_daily_history_range_with_cache(
     code: str,
     start_date: str,
     end_date: str,
     adjust: str = "qfq",
 ) -> pd.DataFrame:
-    start = normalize_trade_date(start_date)
-    end = normalize_trade_date(end_date)
-    cached_rows = bar_service.list_daily_bars_range(code, start, end, adjust=adjust)
-    if cached_rows:
-        return signal_service.normalize_history_df(
-            _cached_daily_bars_to_history_df(cached_rows),
-            code,
-        )
-    return bar_service.fetch_daily_history_range_akshare(code, start, end, adjust)
+    return bar_service.fetch_daily_history_range_cached(
+        code,
+        normalize_trade_date(start_date),
+        normalize_trade_date(end_date),
+        adjust,
+    )
 
 
 def _row_to_review(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:

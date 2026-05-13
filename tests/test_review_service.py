@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from app import bar_service
 from app import event_service
 from app import review_service
 
@@ -124,3 +125,20 @@ def test_backfill_review_snapshots_and_stats(monkeypatch, tmp_path) -> None:
     assert macd_stats["strategy_confidence"] == "低"
     assert macd_stats["strategy_actionable"] is False
     assert "继续积累" in macd_stats["strategy_note"]
+
+
+def test_backfill_review_snapshots_uses_cached_daily_bars(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+    event_service.persist_signal_rows(seed_events())
+    bar_service.upsert_daily_bars("600519", make_history("600519", [10.0, 11.0, 9.0, 12.0, 13.0, 8.0]))
+
+    def broken_fetcher(code: str, start_date: str, end_date: str, adjust: str = "qfq") -> pd.DataFrame:
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr(bar_service, "fetch_daily_history_range_akshare", broken_fetcher)
+
+    result = review_service.backfill_review_snapshots()
+
+    assert result["errors"] == []
+    assert result["count"] == 6
+    assert next(item for item in result["items"] if item["horizon"] == "T+3")["pct_return"] == 20.0
