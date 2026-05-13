@@ -733,6 +733,7 @@ def main() -> None:
                     "signal_score",
                     "signal_direction",
                     "signal_level",
+                    "observation_conclusion",
                     "risk_note",
                     "position_60d",
                     "volume_ratio",
@@ -776,6 +777,7 @@ def main() -> None:
                 preferred_cols = [
                     "score_bucket",
                     "signal_direction",
+                    "observation_conclusion",
                     "risk_bucket",
                     "risk_plan_bucket",
                     "summary",

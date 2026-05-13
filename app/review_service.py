@@ -124,6 +124,7 @@ def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
         "signal_score": payload.get("signal_score"),
         "signal_direction": payload.get("signal_direction"),
         "signal_level": payload.get("signal_level"),
+        "observation_conclusion": payload.get("observation_conclusion"),
         "score_reason": payload.get("score_reason"),
         "risk_note": payload.get("risk_note"),
         "position_60d": payload.get("position_60d"),
@@ -300,10 +301,23 @@ def summarize_review_stats(
     df = pd.DataFrame(snapshots)
     df["score_bucket"] = df["signal_score"].map(_score_bucket)
     df["signal_direction"] = df["signal_direction"].fillna("未知")
+    df["observation_conclusion"] = df["observation_conclusion"].fillna("未标记")
     df["risk_bucket"] = df["risk_note"].map(_risk_bucket)
     df["risk_plan_bucket"] = df["stop_distance_pct"].map(_stop_distance_bucket)
     grouped = (
-        df.groupby(["score_bucket", "signal_direction", "risk_bucket", "risk_plan_bucket", "summary", "indicator", "event_type"], dropna=False)
+        df.groupby(
+            [
+                "score_bucket",
+                "signal_direction",
+                "observation_conclusion",
+                "risk_bucket",
+                "risk_plan_bucket",
+                "summary",
+                "indicator",
+                "event_type",
+            ],
+            dropna=False,
+        )
         .agg(
             sample_count=("pct_return", "count"),
             avg_return=("pct_return", "mean"),
@@ -332,6 +346,7 @@ def summarize_review_stats(
             {
                 "score_bucket": row["score_bucket"],
                 "signal_direction": row["signal_direction"],
+                "observation_conclusion": row["observation_conclusion"],
                 "risk_bucket": row["risk_bucket"],
                 "risk_plan_bucket": row["risk_plan_bucket"],
                 "summary": row["summary"],
@@ -362,6 +377,7 @@ def summarize_review_stats(
         key=lambda item: (
             item["score_bucket"],
             item["signal_direction"],
+            item["observation_conclusion"],
             item["risk_bucket"],
             item["risk_plan_bucket"],
             -item["sample_count"],

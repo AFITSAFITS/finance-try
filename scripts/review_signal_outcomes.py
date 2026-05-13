@@ -89,7 +89,8 @@ def main() -> int:
         for item in signal_stats:
             print(
                 f"score_bucket={item['score_bucket']} | direction={item['signal_direction']} | "
-                f"risk={item['risk_bucket']} | {item['summary']} | horizon={item['horizon']} | "
+                f"conclusion={item['observation_conclusion']} | risk={item['risk_bucket']} | "
+                f"{item['summary']} | horizon={item['horizon']} | "
                 f"samples={item['sample_count']} | avg_return={item['avg_return']} | win_rate={item['win_rate']} | "
                 f"avg_max_drawdown={item['avg_max_drawdown']} | avg_position_60d={item['avg_position_60d']} | "
                 f"avg_volume_ratio={item['avg_volume_ratio']} | risk_plan={item['risk_plan_bucket']} | "

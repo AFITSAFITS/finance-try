@@ -31,6 +31,7 @@ def test_review_cli_stats_only_skips_signal_backfill(monkeypatch, capsys) -> Non
             {
                 "score_bucket": "60-80",
                 "signal_direction": "偏多",
+                "observation_conclusion": "谨慎观察",
                 "risk_bucket": "有风险提示",
                 "risk_plan_bucket": "8%+",
                 "summary": "MA5上穿MA20",
@@ -56,6 +57,7 @@ def test_review_cli_stats_only_skips_signal_backfill(monkeypatch, capsys) -> Non
     captured = capsys.readouterr()
     assert called == {"backfill": False, "stats": True}
     assert "review_snapshots=skipped" in captured.out
+    assert "conclusion=谨慎观察" in captured.out
     assert "risk_plan=8%+" in captured.out
     assert "avg_stop_distance_pct=8.7" in captured.out
 
