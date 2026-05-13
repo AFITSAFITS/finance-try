@@ -204,6 +204,7 @@ def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch
 
 def test_summarize_review_backlog_counts_missing_snapshots(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+    monkeypatch.setattr(strategy_summary_service, "_review_due_cutoff", lambda horizon: "2026-05-10")
     with db.get_connection() as conn:
         first_signal = conn.execute(
             """
@@ -221,6 +222,15 @@ def test_summarize_review_backlog_counts_missing_snapshots(monkeypatch, tmp_path
                 close_price, pct_change, payload_json, created_at
             )
             VALUES ('2026-05-02', '300002', 'MACD', 'golden_cross', 'normal', '信号B', 11, 0.8, '{}', 'now')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO signal_events (
+                trade_date, code, indicator, event_type, severity, summary,
+                close_price, pct_change, payload_json, created_at
+            )
+            VALUES ('2026-05-12', '300004', 'MACD', 'golden_cross', 'normal', '信号D', 12, 0.5, '{}', 'now')
             """
         )
         conn.execute(
@@ -245,10 +255,15 @@ def test_summarize_review_backlog_counts_missing_snapshots(monkeypatch, tmp_path
 
     result = strategy_summary_service.summarize_review_backlog(horizon="T+3")
 
-    assert result["total_count"] == 3
+    assert result["total_count"] == 4
     assert result["reviewed_count"] == 1
-    assert result["missing_count"] == 2
-    assert result["reviewed_ratio"] == 0.3333
-    assert result["signals"]["missing_count"] == 1
+    assert result["missing_count"] == 3
+    assert result["due_missing_count"] == 2
+    assert result["not_due_count"] == 1
+    assert result["reviewed_ratio"] == 0.25
+    assert result["signals"]["missing_count"] == 2
+    assert result["signals"]["due_missing_count"] == 1
+    assert result["signals"]["not_due_count"] == 1
     assert result["limit_up"]["missing_count"] == 1
-    assert result["signals"]["latest_missing"][0]["code"] == "300002"
+    assert result["limit_up"]["due_missing_count"] == 1
+    assert result["signals"]["latest_missing"][0]["code"] == "300004"

@@ -213,6 +213,8 @@ def main() -> int:
                 f"review_backlog total={review_backlog.get('total_count', 0)} | "
                 f"reviewed={review_backlog.get('reviewed_count', 0)} | "
                 f"missing={review_backlog.get('missing_count', 0)} | "
+                f"due_missing={review_backlog.get('due_missing_count', 0)} | "
+                f"not_due={review_backlog.get('not_due_count', 0)} | "
                 f"reviewed_ratio={review_backlog.get('reviewed_ratio')}"
             )
         items = strategy_summary.get("items", [])

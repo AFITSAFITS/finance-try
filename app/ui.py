@@ -1334,6 +1334,8 @@ def main() -> None:
                     f"复盘缺口：总样本={review_backlog.get('total_count', 0)} | "
                     f"已复盘={review_backlog.get('reviewed_count', 0)} | "
                     f"未复盘={review_backlog.get('missing_count', 0)} | "
+                    f"已到期未复盘={review_backlog.get('due_missing_count', 0)} | "
+                    f"未到期={review_backlog.get('not_due_count', 0)} | "
                     f"覆盖率={review_backlog.get('reviewed_ratio')}"
                 )
             strategy_df = pd.DataFrame(data.get("items", []))
