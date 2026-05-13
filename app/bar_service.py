@@ -47,10 +47,14 @@ def cached_daily_bars_to_history_df(rows: list[dict[str, Any]]) -> pd.DataFrame:
 
 
 def _cached_rows_are_usable(rows: list[dict[str, Any]], lookback_days: int) -> bool:
-    if not rows:
+    if not _cached_rows_have_enough_history(rows, lookback_days):
         return False
     today = datetime.now().strftime("%Y-%m-%d")
-    if not any(str(row.get("fetched_at", "")).startswith(today) for row in rows):
+    return any(str(row.get("fetched_at", "")).startswith(today) for row in rows)
+
+
+def _cached_rows_have_enough_history(rows: list[dict[str, Any]], lookback_days: int) -> bool:
+    if not rows:
         return False
     min_rows = 35 if int(lookback_days) >= 60 else 15
     return len(rows) >= min_rows
@@ -72,7 +76,15 @@ def fetch_daily_history_cached(
             code,
         )
 
-    fetched = fetch_daily_history_range_akshare(code, start, end, adjust)
+    try:
+        fetched = fetch_daily_history_range_akshare(code, start, end, adjust)
+    except Exception:
+        if _cached_rows_have_enough_history(cached_rows, lookback_days):
+            return signal_service.normalize_history_df(
+                cached_daily_bars_to_history_df(cached_rows),
+                code,
+            )
+        raise
     upsert_daily_bars(code, fetched, adjust=adjust)
     return fetched
 
