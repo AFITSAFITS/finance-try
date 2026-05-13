@@ -40,6 +40,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--strategy-limit", type=int, default=20, help="Maximum unified strategy rows to print")
     parser.add_argument("--strategy-min-samples", type=int, default=1, help="Minimum samples for unified strategy rows")
+    parser.add_argument("--strategy-data-source", type=str, default="", help="Filter unified strategy rows by data source")
     parser.add_argument(
         "--strategy-actionable-only",
         action="store_true",
@@ -99,6 +100,7 @@ def main() -> int:
                 limit=int(args.strategy_limit),
                 min_samples=int(args.strategy_min_samples),
                 actionable_only=bool(args.strategy_actionable_only),
+                data_source=args.strategy_data_source.strip() or None,
             )
     except Exception as exc:  # noqa: BLE001
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -157,6 +159,7 @@ def main() -> int:
             f"horizon={strategy_summary['horizon']} | total={strategy_summary['total_count']} | "
             f"filtered={strategy_summary['filtered_count']} | actionable={strategy_summary['actionable_count']} | "
             f"min_samples={strategy_summary['min_samples']} | actionable_only={strategy_summary['actionable_only']} | "
+            f"data_source={strategy_summary['data_source']} | "
             f"verdicts={strategy_summary['verdict_counts']} | confidence={strategy_summary['confidence_counts']}"
         )
         items = strategy_summary.get("items", [])

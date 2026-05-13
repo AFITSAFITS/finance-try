@@ -129,6 +129,7 @@ def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch
                 "signal_direction": "偏多",
                 "observation_conclusion": "正常观察",
                 "summary": "信号A",
+                "data_source": "本地缓存",
                 "sample_count": 6,
                 "strategy_verdict": "保留",
                 "strategy_confidence": "中",
@@ -140,6 +141,7 @@ def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch
                 "signal_direction": "偏空",
                 "observation_conclusion": "风险回避",
                 "summary": "信号B",
+                "data_source": "旧缓存兜底",
                 "sample_count": 3,
                 "strategy_verdict": "样本不足",
                 "strategy_confidence": "低",
@@ -154,6 +156,7 @@ def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch
         horizon="T+3",
         min_samples=5,
         actionable_only=True,
+        data_source="本地缓存",
     )
 
     assert result["total_count"] == 2
@@ -161,4 +164,5 @@ def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch
     assert result["actionable_count"] == 1
     assert result["min_samples"] == 5
     assert result["actionable_only"] is True
+    assert result["data_source"] == "本地缓存"
     assert [item["strategy_name"] for item in result["items"]] == ["60-80 / 偏多 / 正常观察 / 信号A"]

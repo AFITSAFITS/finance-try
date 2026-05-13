@@ -600,6 +600,7 @@ def api_strategy_summary(
     limit: int = Query(default=50, ge=1, le=200),
     min_samples: int = Query(default=1, ge=1, le=10000),
     actionable_only: bool = Query(default=False),
+    data_source: str | None = None,
 ) -> dict[str, Any]:
     try:
         result = strategy_summary_service.summarize_strategy_decisions(
@@ -609,6 +610,7 @@ def api_strategy_summary(
             limit=int(limit),
             min_samples=int(min_samples),
             actionable_only=bool(actionable_only),
+            data_source=data_source.strip() if data_source else None,
         )
         return {
             "as_of": tdx_service.now_ts(),

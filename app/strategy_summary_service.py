@@ -107,6 +107,7 @@ def summarize_strategy_decisions(
     limit: int = 50,
     min_samples: int = 1,
     actionable_only: bool = False,
+    data_source: str | None = None,
 ) -> dict[str, Any]:
     signal_items = [
         _normalize_signal_item(item)
@@ -128,6 +129,9 @@ def summarize_strategy_decisions(
     all_items = [*signal_items, *limit_up_items]
     actionable_count = sum(1 for item in all_items if item["strategy_actionable"])
     items = [item for item in all_items if int(item.get("sample_count", 0) or 0) >= min_samples]
+    data_source_filter = str(data_source or "").strip()
+    if data_source_filter:
+        items = [item for item in items if str(item.get("data_source", "") or "") == data_source_filter]
     if actionable_only:
         items = [item for item in items if item["strategy_actionable"]]
     items.sort(key=_sort_key)
@@ -139,6 +143,7 @@ def summarize_strategy_decisions(
         "actionable_count": actionable_count,
         "min_samples": min_samples,
         "actionable_only": bool(actionable_only),
+        "data_source": data_source_filter,
         "verdict_counts": _count_by(items, "strategy_verdict"),
         "confidence_counts": _count_by(items, "strategy_confidence"),
         "items": limited,

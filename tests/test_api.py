@@ -670,6 +670,7 @@ def test_strategy_summary_api(monkeypatch) -> None:
         assert kwargs["limit"] == 20
         assert kwargs["min_samples"] == 5
         assert kwargs["actionable_only"] is True
+        assert kwargs["data_source"] == "本地缓存"
         return {
             "horizon": "T+3",
             "total_count": 1,
@@ -677,6 +678,7 @@ def test_strategy_summary_api(monkeypatch) -> None:
             "actionable_count": 1,
             "min_samples": 5,
             "actionable_only": True,
+            "data_source": "本地缓存",
             "verdict_counts": {"保留": 1},
             "confidence_counts": {"中": 1},
             "items": [
@@ -694,7 +696,13 @@ def test_strategy_summary_api(monkeypatch) -> None:
 
     resp = client.get(
         "/api/strategy/summary",
-        params={"horizon": "T+3", "limit": 20, "min_samples": 5, "actionable_only": True},
+        params={
+            "horizon": "T+3",
+            "limit": 20,
+            "min_samples": 5,
+            "actionable_only": True,
+            "data_source": "本地缓存",
+        },
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -703,6 +711,7 @@ def test_strategy_summary_api(monkeypatch) -> None:
     assert body["actionable_count"] == 1
     assert body["min_samples"] == 5
     assert body["actionable_only"] is True
+    assert body["data_source"] == "本地缓存"
     assert body["items"][0]["strategy_verdict"] == "保留"
 
 
