@@ -68,6 +68,12 @@ def parse_args() -> argparse.Namespace:
         default=True,
         help="Only backfill matured review snapshots after the daily scan",
     )
+    parser.add_argument(
+        "--strategy-guard-horizon",
+        type=str,
+        default=os.getenv("AI_FINANCE_STRATEGY_GUARD_HORIZON", "T+1"),
+        help="Review horizon used to attach strategy conclusions to daily notifications",
+    )
     return parser.parse_args()
 
 
@@ -80,6 +86,7 @@ def main() -> int:
             channel=args.channel,
             max_workers=int(args.max_workers),
             min_score=float(args.min_score),
+            strategy_guard_horizon=args.strategy_guard_horizon,
         )
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -121,6 +128,14 @@ def main() -> int:
             f"observations={summary.get('observation_counts', {})} "
             f"freshness={summary.get('freshness_counts', {})} "
             f"data_sources={summary.get('data_source_counts', {})}"
+        )
+    strategy_guard = result.get("strategy_guard") if isinstance(result.get("strategy_guard"), dict) else {}
+    if strategy_guard:
+        print(
+            "strategy_guard "
+            f"horizon={strategy_guard.get('horizon', '')} "
+            f"matched={strategy_guard.get('matched_count', 0)} "
+            f"total={strategy_guard.get('total_count', 0)}"
         )
 
     new_events = select_newly_delivered_events(

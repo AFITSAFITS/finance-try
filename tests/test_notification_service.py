@@ -64,6 +64,10 @@ def test_build_stdout_messages_formats_events() -> None:
                     "stop_loss_price": 1450.0,
                     "target_price": 1690.0,
                     "risk_note": "无明显风险",
+                    "strategy_verdict": "保留",
+                    "strategy_confidence": "中",
+                    "strategy_sample_count": 6,
+                    "strategy_next_action": "保留该分组，继续跟踪表现",
                 },
             }
         ]
@@ -80,6 +84,10 @@ def test_build_stdout_messages_formats_events() -> None:
     assert "stop_loss=1450.00" in messages[0]
     assert "target=1690.00" in messages[0]
     assert "risk=无明显风险" in messages[0]
+    assert "strategy=保留" in messages[0]
+    assert "strategy_confidence=中" in messages[0]
+    assert "strategy_samples=6" in messages[0]
+    assert "next_action=保留该分组，继续跟踪表现" in messages[0]
 
 
 def test_build_feishu_webhook_payload_adds_signature(monkeypatch) -> None:
@@ -120,6 +128,10 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
                 "target_price": 1690.0,
                 "risk_reward_ratio": 2.0,
                 "risk_note": "无明显风险",
+                "strategy_verdict": "保留",
+                "strategy_confidence": "中",
+                "strategy_sample_count": 6,
+                "strategy_next_action": "保留该分组，继续跟踪表现",
             },
         },
         secret="secret",
@@ -142,7 +154,11 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
     assert "**参考止损**\n1450.00" in field_text
     assert "**参考目标**\n1690.00" in field_text
     assert "**风险收益比**\n2.00" in field_text
+    assert "**策略结论**\n保留" in field_text
+    assert "**结论可信度**\n中" in field_text
+    assert "**复盘样本**\n6" in field_text
     assert payload["card"]["elements"][2]["text"]["content"] == "**风险提示**\n无明显风险"
+    assert payload["card"]["elements"][3]["text"]["content"] == "**下一步动作**\n保留该分组，继续跟踪表现"
     assert payload["timestamp"] == "1710000000"
     assert payload["sign"] == "jWsBkWnzlRKtaP+iZgwraSojMWik4cJR7aysApQZuoA="
 

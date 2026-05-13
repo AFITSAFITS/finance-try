@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
@@ -8,12 +9,23 @@ from app import event_service
 from app import notification_service
 from app import scan_run_service
 from app import signal_service
+from app import strategy_guard_service
 from app import watchlist_service
+
+
+def default_strategy_guard_horizon() -> str:
+    return os.getenv("AI_FINANCE_STRATEGY_GUARD_HORIZON", "T+1").strip() or "T+1"
 
 
 def _event_priority(event: dict[str, Any]) -> tuple[float, float, int]:
     payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
     severity_score = 1.0 if str(event.get("severity", "")).lower() in {"high", "critical"} else 0.0
+    strategy_score = {
+        "保留": 2.0,
+        "继续观察": 1.0,
+        "样本不足": 0.0,
+        "降权": -1.0,
+    }.get(str(payload.get("strategy_verdict", "")), 0.0)
     try:
         signal_score = float(payload.get("signal_score") or 0)
     except (TypeError, ValueError):
@@ -25,7 +37,7 @@ def _event_priority(event: dict[str, Any]) -> tuple[float, float, int]:
         "death_cross": 2,
         "ma5_cross_down_ma20": 1,
     }.get(str(event.get("event_type", "")), 0)
-    return severity_score, signal_score, event_type_rank
+    return severity_score, strategy_score, signal_score, event_type_rank
 
 
 def select_representative_notification_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -49,6 +61,7 @@ def run_default_watchlist_scan(
     max_workers: int = 8,
     bootstrap_if_empty: bool = True,
     min_score: float | None = 60.0,
+    strategy_guard_horizon: str | None = None,
 ) -> dict[str, Any]:
     if bootstrap_if_empty:
         watchlist = watchlist_service.ensure_default_watchlist()
@@ -68,7 +81,12 @@ def run_default_watchlist_scan(
         min_score=min_score,
     )
     persisted_events = event_service.persist_signal_rows(signal_rows)
-    notification_events = select_representative_notification_events(persisted_events)
+    guard_horizon = strategy_guard_horizon.strip() if isinstance(strategy_guard_horizon, str) else ""
+    annotated_events, strategy_guard = strategy_guard_service.annotate_signal_events_with_strategy_decisions(
+        persisted_events,
+        horizon=guard_horizon or default_strategy_guard_horizon(),
+    )
+    notification_events = select_representative_notification_events(annotated_events)
     delivery_results = notification_service.deliver_signal_events(
         notification_events,
         channel=channel,
@@ -93,9 +111,10 @@ def run_default_watchlist_scan(
         "min_score": min_score,
         "signal_summary": signal_summary,
         "scan_run": scan_run,
-        "persisted_events": persisted_events,
+        "persisted_events": annotated_events,
         "notification_events": notification_events,
         "delivery_results": delivery_results,
+        "strategy_guard": strategy_guard,
         "errors": errors,
         "watchlist_source": watchlist.get("source", "existing"),
         "watchlist_message": watchlist.get("message", ""),

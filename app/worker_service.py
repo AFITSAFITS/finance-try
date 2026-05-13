@@ -50,6 +50,7 @@ def run_single_scan_job(
     review_horizons: list[int] | tuple[int, ...] | None = None,
     review_summary_horizon: str = "T+3",
     review_due_only: bool = True,
+    strategy_guard_horizon: str | None = None,
 ) -> dict[str, Any]:
     result = scan_workflow.run_default_watchlist_scan(
         lookback_days=int(lookback_days),
@@ -57,6 +58,7 @@ def run_single_scan_job(
         channel=channel,
         max_workers=int(max_workers),
         min_score=float(min_score),
+        strategy_guard_horizon=strategy_guard_horizon,
     )
     if not review_after_scan:
         return result
@@ -114,6 +116,7 @@ def run_worker_loop(
     review_horizons: list[int] | tuple[int, ...] | None = None,
     review_summary_horizon: str = "T+3",
     review_due_only: bool = True,
+    strategy_guard_horizon: str | None = None,
     schedule_time: str = "15:05",
     timezone_name: str = "Asia/Shanghai",
     poll_seconds: int = 30,
@@ -135,6 +138,7 @@ def run_worker_loop(
                 review_horizons=review_horizons,
                 review_summary_horizon=review_summary_horizon,
                 review_due_only=review_due_only,
+                strategy_guard_horizon=strategy_guard_horizon,
             )
             last_run_date = now.strftime("%Y-%m-%d")
             summary = result.get("signal_summary", {})
@@ -149,6 +153,7 @@ def run_worker_loop(
                 f"scan_run_id={(result.get('scan_run') or {}).get('id', '')} "
                 f"status={(result.get('scan_run') or {}).get('status', '')} "
                 f"min_score={result.get('min_score', '')} "
+                f"strategy_matched={(result.get('strategy_guard') or {}).get('matched_count', 0)} "
                 f"stale_signals={summary.get('stale_signals', 0) if isinstance(summary, dict) else 0} "
                 f"errors={len(result.get('errors', []))} "
                 f"review_snapshots={review_result.get('count', '') if review_after_scan else ''} "

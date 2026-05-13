@@ -86,6 +86,7 @@ class RunDailyJobRequest(BaseModel):
     review_horizons: list[int] = Field(default_factory=lambda: [1, 3, 5])
     review_summary_horizon: str = "T+3"
     review_due_only: bool = True
+    strategy_guard_horizon: str = "T+1"
 
 
 class BackfillReviewsRequest(BaseModel):
@@ -439,6 +440,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             channel=req.channel.strip() or "stdout",
             max_workers=int(req.max_workers),
             min_score=float(req.min_score),
+            strategy_guard_horizon=req.strategy_guard_horizon.strip() or "T+1",
         )
         review_result: dict[str, Any] | None = None
         review_stats: list[dict[str, Any]] = []
@@ -487,6 +489,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             "elapsed_seconds": result.get("elapsed_seconds"),
             "min_score": result.get("min_score"),
             "signal_summary": result.get("signal_summary", {}),
+            "strategy_guard": result.get("strategy_guard", {}),
             "scan_run": result.get("scan_run", {}),
             "notification_count": len(result.get("notification_events", [])),
             "items": result["persisted_events"],

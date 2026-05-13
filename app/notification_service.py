@@ -33,13 +33,19 @@ def format_event_message(event: dict[str, Any]) -> str:
     candlestick_pattern = _clean_display(payload.get("candlestick_pattern"))
     stop_loss_price = _format_number(payload.get("stop_loss_price"))
     target_price = _format_number(payload.get("target_price"))
+    strategy_verdict = _clean_display(payload.get("strategy_verdict"))
+    strategy_confidence = _clean_display(payload.get("strategy_confidence"))
+    strategy_next_action = _clean_display(payload.get("strategy_next_action"))
+    strategy_sample_count = _clean_display(payload.get("strategy_sample_count"))
     return (
         f"[{trade_date}] {code} {summary} | severity={severity} | "
         f"close={close_price} | pct_change={pct_change} | score={signal_score} | conclusion={observation_conclusion} | "
         f"data_freshness={data_freshness} | data_source={data_source} | "
         f"position_60d={position_60d} | volume_ratio={volume_ratio} | "
         f"relative_strength={relative_strength} | candlestick={candlestick_pattern} | "
-        f"stop_loss={stop_loss_price} | target={target_price} | risk={risk_note}"
+        f"stop_loss={stop_loss_price} | target={target_price} | risk={risk_note} | "
+        f"strategy={strategy_verdict} | strategy_confidence={strategy_confidence} | "
+        f"strategy_samples={strategy_sample_count} | next_action={strategy_next_action}"
     )
 
 
@@ -101,6 +107,10 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
     stop_loss_price = _format_number(payload.get("stop_loss_price"))
     target_price = _format_number(payload.get("target_price"))
     risk_reward_ratio = _format_number(payload.get("risk_reward_ratio"))
+    strategy_verdict = _clean_display(payload.get("strategy_verdict"))
+    strategy_confidence = _clean_display(payload.get("strategy_confidence"))
+    strategy_sample_count = _clean_display(payload.get("strategy_sample_count"))
+    strategy_next_action = _clean_display(payload.get("strategy_next_action"))
 
     card_payload: dict[str, Any] = {
         "msg_type": "interactive",
@@ -144,6 +154,9 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**参考止损**\n{stop_loss_price}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**参考目标**\n{target_price}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**风险收益比**\n{risk_reward_ratio}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**策略结论**\n{strategy_verdict}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**结论可信度**\n{strategy_confidence}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**复盘样本**\n{strategy_sample_count}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**指标**\n{indicator}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**类型**\n{event_type}"}},
                     ],
@@ -153,6 +166,13 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
                     "text": {
                         "tag": "lark_md",
                         "content": f"**风险提示**\n{risk_note}",
+                    },
+                },
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": f"**下一步动作**\n{strategy_next_action}",
                     },
                 },
                 {

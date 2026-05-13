@@ -63,6 +63,12 @@ def parse_args() -> argparse.Namespace:
         help="Only backfill matured review snapshots after worker scans",
     )
     parser.add_argument(
+        "--strategy-guard-horizon",
+        type=str,
+        default=os.getenv("AI_FINANCE_STRATEGY_GUARD_HORIZON", "T+1"),
+        help="Review horizon used to attach strategy conclusions to worker notifications",
+    )
+    parser.add_argument(
         "--schedule-time",
         type=str,
         default=os.getenv("AI_FINANCE_WORKER_SCHEDULE_TIME", "15:05"),
@@ -98,6 +104,7 @@ def main() -> int:
                 review_horizons=parse_horizon_args(args.review_horizons),
                 review_summary_horizon=args.review_summary_horizon,
                 review_due_only=bool(args.review_due_only),
+                strategy_guard_horizon=args.strategy_guard_horizon,
             )
             print(
                 f"watchlist={result['watchlist'].get('name', '')} "
@@ -105,6 +112,7 @@ def main() -> int:
                 f"min_score={result.get('min_score', '')} "
                 f"events={len(result.get('persisted_events', []))} "
                 f"notification_events={len(result.get('notification_events', []))} "
+                f"strategy_matched={(result.get('strategy_guard') or {}).get('matched_count', 0)} "
                 f"errors={len(result.get('errors', []))}"
             )
             if args.review_after_scan:
@@ -129,6 +137,7 @@ def main() -> int:
             review_horizons=parse_horizon_args(args.review_horizons),
             review_summary_horizon=args.review_summary_horizon,
             review_due_only=bool(args.review_due_only),
+            strategy_guard_horizon=args.strategy_guard_horizon,
             schedule_time=args.schedule_time,
             timezone_name=args.timezone,
             poll_seconds=int(args.poll_seconds),

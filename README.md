@@ -198,6 +198,7 @@ python scripts/run_daily_scan.py --review-after-scan --review-summary-horizon T+
 
 每日任务默认只保存和通知评分 60 以上的信号；如果想保留全部信号，可以设置 `--min-score 0`。
 同一只股票同一天如果触发多个信号，系统会保存全部事件用于复盘，但通知只发送一条代表信号，避免重复刷屏。
+每日任务会自动匹配已有复盘结论，默认使用 T+1；如果当前信号所属分组已经有“保留、降权、样本不足”等结论，终端和飞书通知会带上策略结论、可信度、复盘样本数和下一步动作。需要切换周期时，可以用 `--strategy-guard-horizon T+3` 或环境变量 `AI_FINANCE_STRATEGY_GUARD_HORIZON`。
 如果希望日常扫描后顺手积累复盘结果，可以加 `--review-after-scan`；需要限制复盘范围时，可以配合 `--review-trade-date`。网页里的 `今日提醒` 也支持勾选“扫描后复盘已到期信号”。
 扫描后复盘默认只处理已经到期的样本；如果确实要尝试全部周期，可以加 `--no-review-due-only`。
 
@@ -510,6 +511,7 @@ AI_FINANCE_WORKER_POLL_SECONDS=30
 AI_FINANCE_PROVIDER_TIMEOUT_SECONDS=12
 AI_FINANCE_DAILY_MIN_SCORE=60
 AI_FINANCE_REVIEW_DUE_ONLY=true
+AI_FINANCE_STRATEGY_GUARD_HORIZON=T+1
 ```
 
 如果你更想用宿主机调度器，也可以关掉 `worker`，自己定时执行：

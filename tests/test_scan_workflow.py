@@ -38,6 +38,31 @@ def test_select_representative_notification_events_keeps_one_per_stock_date() ->
     assert [item["id"] for item in selected] == [2, 3]
 
 
+def test_select_representative_notification_events_prefers_better_strategy_when_strength_ties() -> None:
+    events = [
+        {
+            "id": 1,
+            "trade_date": "2026-05-12",
+            "code": "600001",
+            "severity": "normal",
+            "event_type": "golden_cross",
+            "payload": {"signal_score": 80, "strategy_verdict": "降权"},
+        },
+        {
+            "id": 2,
+            "trade_date": "2026-05-12",
+            "code": "600001",
+            "severity": "normal",
+            "event_type": "golden_cross",
+            "payload": {"signal_score": 80, "strategy_verdict": "保留"},
+        },
+    ]
+
+    selected = scan_workflow.select_representative_notification_events(events)
+
+    assert [item["id"] for item in selected] == [2]
+
+
 def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
     def fake_ensure_default_watchlist():
@@ -88,9 +113,15 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch, tmp_
 
     def fake_deliver_signal_events(events, channel):
         delivered["ids"] = [item["id"] for item in events]
+        delivered["strategy_verdicts"] = [item.get("payload", {}).get("strategy_verdict") for item in events]
         return [{"signal_event_id": item["id"], "created": True} for item in events]
 
     monkeypatch.setattr(scan_workflow.event_service, "persist_signal_rows", lambda df: saved_events)
+    monkeypatch.setattr(
+        scan_workflow.strategy_guard_service,
+        "annotate_signal_events_with_strategy_decisions",
+        lambda events, horizon: ([{**item, "payload": {**item.get("payload", {}), "strategy_verdict": "保留"}} for item in events], {"enabled": True, "horizon": horizon, "matched_count": 2, "total_count": 2}),
+    )
     monkeypatch.setattr(scan_workflow.notification_service, "deliver_signal_events", fake_deliver_signal_events)
 
     result = scan_workflow.run_default_watchlist_scan()
@@ -105,5 +136,7 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch, tmp_
     assert result["scan_run"]["summary"]["signals"] == 1
     assert [item["id"] for item in result["notification_events"]] == [2]
     assert delivered["ids"] == [2]
+    assert delivered["strategy_verdicts"] == ["保留"]
+    assert result["strategy_guard"]["matched_count"] == 2
     assert result["watchlist_source"] == "seed"
     assert result["watchlist_message"] == "已使用内置种子股票池"
