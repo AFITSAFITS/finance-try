@@ -237,7 +237,7 @@ python scripts/get_stock_data.py limit-up-breakthroughs --trade-date 2026-05-12
 python scripts/get_stock_data.py limit-up-breakthroughs --min-score 60 --max-items 50 --pool-limit 200
 ```
 
-涨停突破候选的 K 线分析也会复用日线缓存；外部行情源临时不可用时，会尽量使用数量足够的旧缓存继续评分，并在候选 payload 中记录数据来源。
+涨停突破候选的 K 线分析也会复用日线缓存；外部行情源临时不可用时，会尽量使用数量足够的旧缓存继续评分，并在候选结果、页面表格和复盘统计里记录数据来源。
 
 ### 板块轮动
 

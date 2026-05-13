@@ -475,6 +475,8 @@ def main() -> int:
                 "consecutive_boards",
                 "sector_limit_up_count",
                 "sector_heat_rank",
+                "data_source",
+                "cache_fetched_at",
                 "score",
                 "reason",
             ]

@@ -627,6 +627,8 @@ def main() -> None:
                     "consecutive_boards",
                     "sector_limit_up_count",
                     "sector_heat_rank",
+                    "data_source",
+                    "cache_fetched_at",
                     "score",
                     "reason",
                 ]
@@ -658,6 +660,8 @@ def main() -> None:
                     "pct_change",
                     "sector_limit_up_count",
                     "sector_heat_rank",
+                    "data_source",
+                    "cache_fetched_at",
                     "score",
                     "reason",
                     "created_at",
@@ -700,6 +704,8 @@ def main() -> None:
                     "name",
                     "score",
                     "sector_limit_up_count",
+                    "data_source",
+                    "cache_fetched_at",
                     "horizon",
                     "future_trade_date",
                     "pct_return",
@@ -730,6 +736,7 @@ def main() -> None:
             else:
                 cols = [
                     "score_bucket",
+                    "data_source",
                     "sample_count",
                     "avg_return",
                     "win_rate",

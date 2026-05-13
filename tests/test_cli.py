@@ -153,3 +153,57 @@ def test_realtime_quotes_cli_success(monkeypatch, capsys) -> None:
     assert "source=eastmoney" in output.out
     assert "贵州茅台" in output.out
     assert "WARNING [000001]: 未返回实时行情" in output.err
+
+
+def test_limit_up_breakthroughs_cli_prints_data_source(monkeypatch, capsys) -> None:
+    module = load_cli_module()
+
+    def fake_scan_and_save_limit_up_breakthroughs(**kwargs):
+        assert kwargs["trade_date"] == "2026-05-12"
+        return {
+            "trade_date": "2026-05-12",
+            "count": 1,
+            "items": [
+                {
+                    "trade_date": "2026-05-12",
+                    "code": "300502",
+                    "name": "样例股份",
+                    "sector": "软件服务",
+                    "close_price": 12.2,
+                    "pct_change": 10.0,
+                    "turnover_rate": 8.5,
+                    "consecutive_boards": 1,
+                    "sector_limit_up_count": 3,
+                    "sector_heat_rank": 1,
+                    "data_source": "旧缓存兜底",
+                    "cache_fetched_at": "2026-01-01 00:00:00",
+                    "score": 65,
+                    "reason": "涨停强度确认",
+                }
+            ],
+            "errors": [{"股票代码": "600001", "error": "network timeout"}],
+        }
+
+    monkeypatch.setattr(
+        module.limit_up_service,
+        "scan_and_save_limit_up_breakthroughs",
+        fake_scan_and_save_limit_up_breakthroughs,
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT_PATH),
+            "limit-up-breakthroughs",
+            "--trade-date",
+            "2026-05-12",
+        ],
+    )
+
+    result = module.main()
+    output = capsys.readouterr()
+
+    assert result == 0
+    assert "旧缓存兜底" in output.out
+    assert "2026-01-01 00:00:00" in output.out
+    assert "WARNING [600001]: network timeout" in output.err

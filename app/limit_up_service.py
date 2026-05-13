@@ -26,6 +26,8 @@ LIMIT_UP_OUTPUT_COLUMNS = [
     "consecutive_boards",
     "sector_limit_up_count",
     "sector_heat_rank",
+    "data_source",
+    "cache_fetched_at",
     "score",
     "reason",
 ]
@@ -262,6 +264,7 @@ def scan_limit_up_breakthroughs(
 
 
 def _row_to_candidate(row: sqlite3.Row) -> dict[str, Any]:
+    payload = json.loads(row["payload_json"])
     return {
         "id": row["id"],
         "trade_date": row["trade_date"],
@@ -279,7 +282,9 @@ def _row_to_candidate(row: sqlite3.Row) -> dict[str, Any]:
         "open_board_count": row["open_board_count"],
         "score": row["score"],
         "reason": row["reason"],
-        "payload": json.loads(row["payload_json"]),
+        "data_source": payload.get("data_source"),
+        "cache_fetched_at": payload.get("cache_fetched_at"),
+        "payload": payload,
         "created_at": row["created_at"],
     }
 
@@ -422,7 +427,7 @@ def _load_limit_up_candidates(
         rows = conn.execute(
             f"""
             SELECT id, trade_date, code, name, sector, close_price, score,
-                   sector_limit_up_count, sector_heat_rank, reason
+                   sector_limit_up_count, sector_heat_rank, reason, payload_json
             FROM limit_up_candidates
             {where_sql}
             ORDER BY trade_date ASC, code ASC, id ASC
@@ -454,6 +459,7 @@ def fetch_daily_history_range_with_cache(
 
 
 def _row_to_review(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
+    payload = json.loads(row["payload_json"]) if row["payload_json"] else {}
     return {
         "id": row["id"],
         "limit_up_candidate_id": row["limit_up_candidate_id"],
@@ -464,6 +470,8 @@ def _row_to_review(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
         "score": row["score"],
         "sector_limit_up_count": row["sector_limit_up_count"],
         "sector_heat_rank": row["sector_heat_rank"],
+        "data_source": payload.get("data_source"),
+        "cache_fetched_at": payload.get("cache_fetched_at"),
         "horizon": row["horizon"],
         "future_trade_date": row["future_trade_date"],
         "future_close_price": row["future_close_price"],
@@ -498,6 +506,7 @@ def list_limit_up_review_snapshots(
             f"""
             SELECT r.id, r.limit_up_candidate_id, c.trade_date, c.code, c.name, c.sector,
                    c.score, c.sector_limit_up_count, c.sector_heat_rank,
+                   c.payload_json,
                    r.horizon, r.future_trade_date, r.future_close_price,
                    r.pct_return, r.max_drawdown, r.updated_at
             FROM limit_up_review_snapshots r
@@ -602,6 +611,7 @@ def backfill_limit_up_review_snapshots(
                             """
                             SELECT r.id, r.limit_up_candidate_id, c.trade_date, c.code, c.name, c.sector,
                                    c.score, c.sector_limit_up_count, c.sector_heat_rank,
+                                   c.payload_json,
                                    r.horizon, r.future_trade_date, r.future_close_price,
                                    r.pct_return, r.max_drawdown, r.updated_at
                             FROM limit_up_review_snapshots r
@@ -634,13 +644,14 @@ def summarize_limit_up_review_stats(
         return []
 
     df = pd.DataFrame(snapshots)
+    df["data_source"] = df["data_source"].fillna("未知")
     df["score_bucket"] = pd.cut(
         df["score"].fillna(0),
         bins=[-1, 40, 60, 80, 101],
         labels=["0-40", "40-60", "60-80", "80+"],
     )
     grouped = (
-        df.groupby("score_bucket", observed=True)
+        df.groupby(["score_bucket", "data_source"], observed=True)
         .agg(
             sample_count=("pct_return", "count"),
             avg_return=("pct_return", "mean"),
@@ -665,6 +676,7 @@ def summarize_limit_up_review_stats(
         items.append(
             {
                 "score_bucket": str(row["score_bucket"]),
+                "data_source": str(row["data_source"]),
                 "sample_count": int(row["sample_count"]),
                 "avg_return": avg_return,
                 "win_rate": win_rate,

@@ -90,7 +90,11 @@ def test_persist_and_list_limit_up_candidates(monkeypatch, tmp_path) -> None:
                 "open_board_count": 0,
                 "score": 85,
                 "reason": "突破近60日收盘高点",
-                "payload": {"breakout_ratio": 1.05},
+                "payload": {
+                    "breakout_ratio": 1.05,
+                    "data_source": "旧缓存兜底",
+                    "cache_fetched_at": "2026-01-01 00:00:00",
+                },
             }
         ]
     )
@@ -100,6 +104,8 @@ def test_persist_and_list_limit_up_candidates(monkeypatch, tmp_path) -> None:
     assert len(items) == 1
     assert items[0]["payload"]["breakout_ratio"] == 1.05
     assert items[0]["sector_limit_up_count"] == 4
+    assert items[0]["data_source"] == "旧缓存兜底"
+    assert items[0]["cache_fetched_at"] == "2026-01-01 00:00:00"
 
 
 def test_build_sector_heat_map_counts_limit_up_clusters() -> None:
@@ -170,7 +176,11 @@ def test_backfill_limit_up_review_snapshots_and_stats(monkeypatch, tmp_path) -> 
                 "open_board_count": 0,
                 "score": 85,
                 "reason": "突破近60日收盘高点",
-                "payload": {"breakout_ratio": 1.05},
+                "payload": {
+                    "breakout_ratio": 1.05,
+                    "data_source": "旧缓存兜底",
+                    "cache_fetched_at": "2026-01-01 00:00:00",
+                },
             }
         ]
     )
@@ -193,9 +203,12 @@ def test_backfill_limit_up_review_snapshots_and_stats(monkeypatch, tmp_path) -> 
     assert len(snapshots) == 1
     assert snapshots[0]["pct_return"] == 20.0
     assert snapshots[0]["max_drawdown"] == -10.0
+    assert snapshots[0]["data_source"] == "旧缓存兜底"
+    assert snapshots[0]["cache_fetched_at"] == "2026-01-01 00:00:00"
     assert stats == [
         {
             "score_bucket": "80+",
+            "data_source": "旧缓存兜底",
             "sample_count": 1,
             "avg_return": 20.0,
             "win_rate": 1.0,
