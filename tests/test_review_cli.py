@@ -33,6 +33,7 @@ def test_review_cli_stats_only_skips_signal_backfill(monkeypatch, capsys) -> Non
                 "signal_direction": "偏多",
                 "observation_conclusion": "谨慎观察",
                 "data_freshness": "最近交易日",
+                "data_source": "旧缓存兜底",
                 "risk_bucket": "有风险提示",
                 "risk_plan_bucket": "8%+",
                 "summary": "MA5上穿MA20",
@@ -67,6 +68,7 @@ def test_review_cli_stats_only_skips_signal_backfill(monkeypatch, capsys) -> Non
     assert "review_snapshots=skipped" in captured.out
     assert "conclusion=谨慎观察" in captured.out
     assert "data_freshness=最近交易日" in captured.out
+    assert "data_source=旧缓存兜底" in captured.out
     assert "risk_plan=8%+" in captured.out
     assert "avg_stop_distance_pct=8.7" in captured.out
     assert "stop_hit_rate=0.25" in captured.out

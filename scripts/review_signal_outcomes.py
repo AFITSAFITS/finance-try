@@ -90,6 +90,7 @@ def main() -> int:
             print(
                 f"score_bucket={item['score_bucket']} | direction={item['signal_direction']} | "
                 f"conclusion={item['observation_conclusion']} | data_freshness={item['data_freshness']} | "
+                f"data_source={item['data_source']} | "
                 f"risk={item['risk_bucket']} | "
                 f"{item['summary']} | horizon={item['horizon']} | "
                 f"samples={item['sample_count']} | avg_return={item['avg_return']} | win_rate={item['win_rate']} | "

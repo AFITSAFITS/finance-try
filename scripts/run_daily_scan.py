@@ -175,6 +175,7 @@ def main() -> int:
                 print(
                     "review_summary "
                     f"horizon={item['horizon']} "
+                    f"data_source={item.get('data_source', '')} "
                     f"samples={item['sample_count']} "
                     f"avg_return={item['avg_return']} "
                     f"win_rate={item['win_rate']} "
