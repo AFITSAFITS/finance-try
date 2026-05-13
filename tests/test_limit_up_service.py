@@ -218,6 +218,8 @@ def test_backfill_limit_up_review_snapshots_and_stats(monkeypatch, tmp_path) -> 
             "strategy_note": "样本数少于5，先继续积累",
             "strategy_confidence": "低",
             "strategy_actionable": False,
+            "min_actionable_samples": 5,
+            "samples_to_actionable": 4,
             "horizon": "T+3",
         }
     ]

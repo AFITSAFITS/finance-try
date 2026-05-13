@@ -681,6 +681,8 @@ def summarize_limit_up_review_stats(
                 "strategy_note": decision["strategy_note"],
                 "strategy_confidence": decision["strategy_confidence"],
                 "strategy_actionable": decision["strategy_actionable"],
+                "min_actionable_samples": decision["min_actionable_samples"],
+                "samples_to_actionable": decision["samples_to_actionable"],
                 "horizon": horizon,
             }
         )

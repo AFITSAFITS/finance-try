@@ -6,19 +6,26 @@ HIGH_CONFIDENCE_SAMPLES = 20
 
 
 def build_sample_confidence(sample_count: int) -> dict[str, object]:
+    samples_to_actionable = max(0, MIN_ACTIONABLE_SAMPLES - int(sample_count))
     if sample_count < MIN_ACTIONABLE_SAMPLES:
         return {
             "strategy_confidence": "低",
             "strategy_actionable": False,
+            "min_actionable_samples": MIN_ACTIONABLE_SAMPLES,
+            "samples_to_actionable": samples_to_actionable,
         }
     if sample_count < HIGH_CONFIDENCE_SAMPLES:
         return {
             "strategy_confidence": "中",
             "strategy_actionable": True,
+            "min_actionable_samples": MIN_ACTIONABLE_SAMPLES,
+            "samples_to_actionable": samples_to_actionable,
         }
     return {
         "strategy_confidence": "高",
         "strategy_actionable": True,
+        "min_actionable_samples": MIN_ACTIONABLE_SAMPLES,
+        "samples_to_actionable": samples_to_actionable,
     }
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app import limit_up_service
+from app import review_decision
 from app import review_service
 
 VERDICT_PRIORITY = {
@@ -49,6 +50,11 @@ def _normalize_signal_item(item: dict[str, Any]) -> dict[str, Any]:
         "strategy_verdict": item.get("strategy_verdict", ""),
         "strategy_confidence": item.get("strategy_confidence", ""),
         "strategy_actionable": bool(item.get("strategy_actionable", False)),
+        "min_actionable_samples": item.get("min_actionable_samples", review_decision.MIN_ACTIONABLE_SAMPLES),
+        "samples_to_actionable": item.get(
+            "samples_to_actionable",
+            max(0, review_decision.MIN_ACTIONABLE_SAMPLES - int(item.get("sample_count", 0) or 0)),
+        ),
         "strategy_note": item.get("strategy_note", ""),
     }
 
@@ -66,6 +72,11 @@ def _normalize_limit_up_item(item: dict[str, Any]) -> dict[str, Any]:
         "strategy_verdict": item.get("strategy_verdict", ""),
         "strategy_confidence": item.get("strategy_confidence", ""),
         "strategy_actionable": bool(item.get("strategy_actionable", False)),
+        "min_actionable_samples": item.get("min_actionable_samples", review_decision.MIN_ACTIONABLE_SAMPLES),
+        "samples_to_actionable": item.get(
+            "samples_to_actionable",
+            max(0, review_decision.MIN_ACTIONABLE_SAMPLES - int(item.get("sample_count", 0) or 0)),
+        ),
         "strategy_note": item.get("strategy_note", ""),
     }
 

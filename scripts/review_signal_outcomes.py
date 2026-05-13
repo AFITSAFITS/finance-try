@@ -126,6 +126,7 @@ def main() -> int:
                 f"same_day_hit_rate={item['same_day_hit_rate']} | "
                 f"verdict={item['strategy_verdict']} | "
                 f"confidence={item['strategy_confidence']} | actionable={item['strategy_actionable']} | "
+                f"samples_to_actionable={item.get('samples_to_actionable', '')} | "
                 f"note={item['strategy_note']}"
             )
     elif args.target in {"signals", "both"}:
@@ -144,7 +145,8 @@ def main() -> int:
                 f"win_rate={item['win_rate']} | avg_max_drawdown={item['avg_max_drawdown']} | "
                 f"avg_sector_limit_up_count={item['avg_sector_limit_up_count']} | "
                 f"verdict={item['strategy_verdict']} | confidence={item['strategy_confidence']} | "
-                f"actionable={item['strategy_actionable']} | note={item['strategy_note']}"
+                f"actionable={item['strategy_actionable']} | samples_to_actionable={item.get('samples_to_actionable', '')} | "
+                f"note={item['strategy_note']}"
             )
     elif args.target in {"limit-up", "both"}:
         print("没有可用的涨停候选复盘统计结果。")
@@ -167,6 +169,7 @@ def main() -> int:
                 f"avg_return={item['avg_return']} | win_rate={item['win_rate']} | "
                 f"avg_max_drawdown={item['avg_max_drawdown']} | verdict={item['strategy_verdict']} | "
                 f"confidence={item['strategy_confidence']} | actionable={item['strategy_actionable']} | "
+                f"samples_to_actionable={item.get('samples_to_actionable', '')} | "
                 f"note={item['strategy_note']}"
             )
     return 0
