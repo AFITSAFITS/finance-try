@@ -153,6 +153,7 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
                 "due_missing_count": 1,
                 "not_due_count": 1,
                 "next_due_date": "2026-05-15",
+                "review_now": True,
                 "reviewed_ratio": 0.3333,
             },
             "items": [
@@ -214,6 +215,7 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     assert "due_missing=1" in captured.out
     assert "not_due=1" in captured.out
     assert "next_due_date=2026-05-15" in captured.out
+    assert "review_now=True" in captured.out
     assert "type=日线信号" in captured.out
     assert "next_action=保留该分组" in captured.out
     assert "verdict=保留" in captured.out
@@ -249,6 +251,7 @@ def test_review_cli_prints_strategy_summary_json(monkeypatch, capsys) -> None:
                 "due_missing_count": 0,
                 "not_due_count": 0,
                 "next_due_date": "",
+                "review_now": False,
                 "reviewed_ratio": 1.0,
             },
             "items": [{"strategy_type": "日线信号", "strategy_next_action": "保留该分组"}],
@@ -299,6 +302,7 @@ def test_review_cli_require_actionable_returns_2_when_empty(monkeypatch, capsys)
                 "due_missing_count": 0,
                 "not_due_count": 0,
                 "next_due_date": "",
+                "review_now": False,
                 "reviewed_ratio": None,
             },
             "items": [],

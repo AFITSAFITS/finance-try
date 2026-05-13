@@ -216,6 +216,7 @@ def main() -> int:
                 f"due_missing={review_backlog.get('due_missing_count', 0)} | "
                 f"not_due={review_backlog.get('not_due_count', 0)} | "
                 f"next_due_date={review_backlog.get('next_due_date', '')} | "
+                f"review_now={review_backlog.get('review_now', False)} | "
                 f"reviewed_ratio={review_backlog.get('reviewed_ratio')}"
             )
         items = strategy_summary.get("items", [])

@@ -231,6 +231,7 @@ def _summarize_signal_review_backlog(
         "not_due_count": not_due,
         "due_cutoff": due_cutoff,
         "next_due_date": _review_due_date(next_due_row["trade_date"], horizon) if next_due_row else "",
+        "review_now": due_missing > 0,
         "reviewed_ratio": round(reviewed / total, 4) if total else None,
         "latest_missing": [dict(item) for item in missing_rows],
     }
@@ -303,6 +304,7 @@ def _summarize_limit_up_review_backlog(
         "not_due_count": not_due,
         "due_cutoff": due_cutoff,
         "next_due_date": _review_due_date(next_due_row["trade_date"], horizon) if next_due_row else "",
+        "review_now": due_missing > 0,
         "reviewed_ratio": round(reviewed / total, 4) if total else None,
         "latest_missing": [dict(item) for item in missing_rows],
     }
@@ -335,6 +337,7 @@ def summarize_review_backlog(
         "not_due_count": not_due_count,
         "due_cutoff": _review_due_cutoff(horizon),
         "next_due_date": min(next_due_dates) if next_due_dates else "",
+        "review_now": due_missing_count > 0,
         "reviewed_ratio": round(reviewed_count / total_count, 4) if total_count else None,
         "signals": signal_backlog,
         "limit_up": limit_up_backlog,
