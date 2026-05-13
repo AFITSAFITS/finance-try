@@ -70,6 +70,7 @@ def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> N
     assert result["total_count"] == 3
     assert result["filtered_count"] == 3
     assert result["actionable_count"] == 2
+    assert result["filtered_actionable_count"] == 2
     assert result["min_samples"] == 1
     assert result["actionable_only"] is False
     assert result["verdict_counts"] == {"保留": 1, "样本不足": 1, "降权": 1}
@@ -168,6 +169,7 @@ def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch
     assert result["total_count"] == 2
     assert result["filtered_count"] == 1
     assert result["actionable_count"] == 1
+    assert result["filtered_actionable_count"] == 1
     assert result["min_samples"] == 5
     assert result["actionable_only"] is True
     assert result["data_source"] == "本地缓存"

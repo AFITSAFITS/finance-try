@@ -122,6 +122,7 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
             "total_count": 1,
             "filtered_count": 1,
             "actionable_count": 1,
+            "filtered_actionable_count": 1,
             "min_samples": 5,
             "actionable_only": True,
             "data_source": "本地缓存",
@@ -173,6 +174,7 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     assert "total=1" in captured.out
     assert "filtered=1" in captured.out
     assert "actionable=1" in captured.out
+    assert "filtered_actionable=1" in captured.out
     assert "min_samples=5" in captured.out
     assert "actionable_only=True" in captured.out
     assert "data_source=本地缓存" in captured.out
@@ -196,6 +198,7 @@ def test_review_cli_prints_strategy_summary_json(monkeypatch, capsys) -> None:
             "total_count": 1,
             "filtered_count": 1,
             "actionable_count": 1,
+            "filtered_actionable_count": 1,
             "min_samples": kwargs["min_samples"],
             "actionable_only": kwargs["actionable_only"],
             "data_source": kwargs["data_source"] or "",
@@ -219,3 +222,38 @@ def test_review_cli_prints_strategy_summary_json(monkeypatch, capsys) -> None:
     assert payload["limit_up_review_snapshots"] == "skipped"
     assert payload["strategy_summary"]["data_source"] == "本地缓存"
     assert payload["strategy_summary"]["items"][0]["strategy_next_action"] == "保留该分组"
+
+
+def test_review_cli_require_actionable_returns_2_when_empty(monkeypatch, capsys) -> None:
+    module = load_module()
+
+    monkeypatch.setattr(module.review_service, "summarize_review_stats", lambda **kwargs: [])
+    monkeypatch.setattr(module.limit_up_service, "summarize_limit_up_review_stats", lambda **kwargs: [])
+    monkeypatch.setattr(
+        module.strategy_summary_service,
+        "summarize_strategy_decisions",
+        lambda **kwargs: {
+            "horizon": kwargs["horizon"],
+            "total_count": 1,
+            "filtered_count": 0,
+            "actionable_count": 0,
+            "filtered_actionable_count": 0,
+            "min_samples": kwargs["min_samples"],
+            "actionable_only": kwargs["actionable_only"],
+            "data_source": kwargs["data_source"] or "",
+            "verdict_counts": {},
+            "confidence_counts": {},
+            "strategy_type_counts": {},
+            "data_source_counts": {},
+            "items": [],
+        },
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [str(REVIEW_SCRIPT), "--stats-only", "--strategy-summary", "--strategy-require-actionable"],
+    )
+
+    assert module.main() == 2
+    captured = capsys.readouterr()
+    assert "没有可行动的策略结论" in captured.err

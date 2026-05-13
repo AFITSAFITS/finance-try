@@ -1297,6 +1297,7 @@ def main() -> None:
                     "总分组": data.get("total_count", 0),
                     "过滤后": data.get("filtered_count", 0),
                     "可执行": data.get("actionable_count", 0),
+                    "过滤后可执行": data.get("filtered_actionable_count", 0),
                     "展示": data.get("count", 0),
                 }
             )

@@ -52,6 +52,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print machine-readable JSON for the unified strategy summary",
     )
+    parser.add_argument(
+        "--strategy-require-actionable",
+        action="store_true",
+        help="Exit with code 2 when the filtered unified strategy summary has no actionable rows",
+    )
     return parser.parse_args()
 
 
@@ -98,7 +103,7 @@ def main() -> int:
                 code=args.code.strip() or None,
             )
 
-        if args.strategy_summary or args.strategy_json:
+        if args.strategy_summary or args.strategy_json or args.strategy_require_actionable:
             strategy_summary = strategy_summary_service.summarize_strategy_decisions(
                 horizon=args.summary_horizon.strip() or "T+3",
                 trade_date=args.trade_date.strip() or None,
@@ -112,6 +117,12 @@ def main() -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
+    require_actionable_failed = bool(
+        args.strategy_require_actionable
+        and strategy_summary is not None
+        and int(strategy_summary.get("filtered_actionable_count", 0) or 0) == 0
+    )
+
     if args.strategy_json:
         print(
             json.dumps(
@@ -123,7 +134,7 @@ def main() -> int:
                 ensure_ascii=False,
             )
         )
-        return 0
+        return 2 if require_actionable_failed else 0
 
     print(f"review_snapshots={signal_result['count']}")
     for error in signal_result["errors"]:
@@ -179,6 +190,7 @@ def main() -> int:
         print(
             f"horizon={strategy_summary['horizon']} | total={strategy_summary['total_count']} | "
             f"filtered={strategy_summary['filtered_count']} | actionable={strategy_summary['actionable_count']} | "
+            f"filtered_actionable={strategy_summary['filtered_actionable_count']} | "
             f"min_samples={strategy_summary['min_samples']} | actionable_only={strategy_summary['actionable_only']} | "
             f"data_source={strategy_summary['data_source']} | "
             f"verdicts={strategy_summary['verdict_counts']} | confidence={strategy_summary['confidence_counts']} | "
@@ -198,6 +210,9 @@ def main() -> int:
                 f"next_action={item.get('strategy_next_action', '')} | "
                 f"note={item['strategy_note']}"
             )
+    if require_actionable_failed:
+        print("ERROR: 没有可行动的策略结论。", file=sys.stderr)
+        return 2
     return 0
 
 

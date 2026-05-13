@@ -230,11 +230,12 @@ python scripts/review_signal_outcomes.py --stats-only --strategy-summary --strat
 python scripts/review_signal_outcomes.py --stats-only --strategy-summary --strategy-actionable-only --strategy-min-samples 5
 python scripts/review_signal_outcomes.py --stats-only --strategy-summary --strategy-data-source 本地缓存
 python scripts/review_signal_outcomes.py --stats-only --strategy-json --strategy-data-source 本地缓存
+python scripts/review_signal_outcomes.py --stats-only --strategy-summary --strategy-require-actionable
 ```
 
 `--stats-only` 只读取已经保存的复盘结果，不会重新请求外部行情源，适合日常快速查看统计。正常回填复盘时会优先复用本地 K 线缓存，缓存不足时再请求外部行情源。
 日线复盘统计会同时按评分区间、信号方向、观察结论、数据时效、数据来源、风险提示和止损距离分层，并展示平均 60 日位置、平均量能比、平均止损距离、平均风险收益比、止损触发率、目标触发率、止损先到率、目标先到率、策略结论、下一步动作、结论可信度和距离可行动还差的样本数，便于判断哪些信号应该继续保留、观察或降权。
-页面里的 `策略结论` 会把日线信号和涨停策略的复盘统计合在一起，优先展示可执行的保留、降权和观察结论；命令行也可以用 `--strategy-summary` 快速查看同一套结论，并用 `--strategy-actionable-only`、`--strategy-min-samples` 和 `--strategy-data-source` 过滤低样本或指定数据来源。样本不足时会显示还差多少样本才进入可行动区间，并给出继续积累、保留、降权或继续观察的下一步动作；汇总结果也会展示策略类型分布和数据来源分布。需要接入其他自动化流程时，可以用 `--strategy-json` 输出结构化结果。
+页面里的 `策略结论` 会把日线信号和涨停策略的复盘统计合在一起，优先展示可执行的保留、降权和观察结论；命令行也可以用 `--strategy-summary` 快速查看同一套结论，并用 `--strategy-actionable-only`、`--strategy-min-samples` 和 `--strategy-data-source` 过滤低样本或指定数据来源。样本不足时会显示还差多少样本才进入可行动区间，并给出继续积累、保留、降权或继续观察的下一步动作；汇总结果也会展示策略类型分布和数据来源分布。需要接入其他自动化流程时，可以用 `--strategy-json` 输出结构化结果，也可以用 `--strategy-require-actionable` 在过滤后没有可行动结论时返回非 0 状态。
 
 ### 涨停突破候选
 

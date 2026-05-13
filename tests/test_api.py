@@ -676,6 +676,7 @@ def test_strategy_summary_api(monkeypatch) -> None:
             "total_count": 1,
             "filtered_count": 1,
             "actionable_count": 1,
+            "filtered_actionable_count": 1,
             "min_samples": 5,
             "actionable_only": True,
             "data_source": "本地缓存",
@@ -711,6 +712,7 @@ def test_strategy_summary_api(monkeypatch) -> None:
     assert body["count"] == 1
     assert body["filtered_count"] == 1
     assert body["actionable_count"] == 1
+    assert body["filtered_actionable_count"] == 1
     assert body["min_samples"] == 5
     assert body["actionable_only"] is True
     assert body["data_source"] == "本地缓存"

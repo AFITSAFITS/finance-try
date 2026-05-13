@@ -136,6 +136,7 @@ def summarize_strategy_decisions(
         items = [item for item in items if str(item.get("data_source", "") or "") == data_source_filter]
     if actionable_only:
         items = [item for item in items if item["strategy_actionable"]]
+    filtered_actionable_count = sum(1 for item in items if item["strategy_actionable"])
     items.sort(key=_sort_key)
     limited = items[: max(1, int(limit))]
     return {
@@ -143,6 +144,7 @@ def summarize_strategy_decisions(
         "total_count": len(all_items),
         "filtered_count": len(items),
         "actionable_count": actionable_count,
+        "filtered_actionable_count": filtered_actionable_count,
         "min_samples": min_samples,
         "actionable_only": bool(actionable_only),
         "data_source": data_source_filter,
