@@ -22,13 +22,15 @@ def inject_page_style() -> None:
         """
         <style>
         :root {
-            --surface: #f3f6f1;
-            --surface-strong: #e3eae0;
-            --ink: #1f2923;
-            --muted: #667066;
-            --line: #ccd8c8;
-            --accent: #2d6a4f;
-            --accent-soft: #dfeade;
+            --surface: #f6f7f2;
+            --surface-strong: #e8ece2;
+            --panel: #fffef9;
+            --ink: #20241f;
+            --muted: #626b60;
+            --line: #d4dbc9;
+            --accent: #245f47;
+            --accent-soft: #e0eadf;
+            --blue-soft: #dde8ef;
             --warn-soft: #f5e3c7;
             --bad-soft: #eed5d1;
         }
@@ -37,7 +39,7 @@ def inject_page_style() -> None:
             color: var(--ink);
         }
         section[data-testid="stSidebar"] {
-            background: #e7eee4;
+            background: #e9ede4;
             border-right: 1px solid var(--line);
         }
         .block-container {
@@ -50,10 +52,10 @@ def inject_page_style() -> None:
             letter-spacing: 0;
         }
         div[data-testid="stMetric"] {
-            background: #fbfcf8;
+            background: var(--panel);
             border: 1px solid var(--line);
             border-radius: 8px;
-            padding: 14px 16px;
+            padding: 12px 14px;
         }
         div[data-testid="stMetricLabel"] p {
             color: var(--muted);
@@ -61,7 +63,14 @@ def inject_page_style() -> None:
         }
         div[data-testid="stMetricValue"] {
             color: var(--ink);
-            font-size: 1.45rem;
+            font-size: 1.36rem;
+        }
+        div[data-testid="stButton"] button {
+            border-radius: 8px;
+            min-height: 2.4rem;
+        }
+        .stDownloadButton button {
+            border-radius: 8px;
         }
         div[data-testid="stTabs"] button {
             border-radius: 0;
@@ -74,30 +83,30 @@ def inject_page_style() -> None:
         }
         .workbench-hero {
             display: grid;
-            grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.8fr);
-            gap: 18px;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 10px;
             align-items: stretch;
-            margin-bottom: 18px;
+            margin-bottom: 14px;
         }
         .workbench-panel {
-            background: #fbfcf8;
+            background: var(--panel);
             border: 1px solid var(--line);
             border-radius: 8px;
-            padding: 20px 22px;
+            padding: 18px 20px;
         }
         .workbench-title {
             margin: 0;
-            font-size: clamp(1.9rem, 3vw, 3.1rem);
-            line-height: 1.05;
-            font-weight: 760;
+            font-size: clamp(1.65rem, 2.6vw, 2.35rem);
+            line-height: 1.12;
+            font-weight: 740;
             letter-spacing: 0;
         }
         .workbench-subtitle {
-            margin: 12px 0 0;
-            max-width: 780px;
+            margin: 8px 0 0;
+            max-width: 960px;
             color: var(--muted);
-            line-height: 1.65;
-            font-size: 0.98rem;
+            line-height: 1.55;
+            font-size: 0.94rem;
         }
         .status-strip {
             display: flex;
@@ -117,6 +126,10 @@ def inject_page_style() -> None:
             font-size: 0.82rem;
             font-weight: 650;
         }
+        .status-pill.info {
+            background: var(--blue-soft);
+            color: #25495c;
+        }
         .status-pill.warn {
             background: var(--warn-soft);
             color: #755018;
@@ -125,24 +138,97 @@ def inject_page_style() -> None:
             background: var(--bad-soft);
             color: #78362e;
         }
-        .quick-list {
-            margin: 0;
-            padding-left: 1rem;
-            color: var(--muted);
-            line-height: 1.7;
-            font-size: 0.92rem;
+        .workflow-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin: 8px 0 18px;
         }
-        .quick-list strong {
-            color: var(--ink);
+        .workflow-step {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px 13px;
+            min-height: 86px;
+        }
+        .workflow-step span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.75rem;
             font-weight: 700;
+            margin-bottom: 7px;
+        }
+        .workflow-step strong {
+            display: block;
+            color: var(--ink);
+            font-size: 0.96rem;
+            margin-bottom: 5px;
+        }
+        .workflow-step p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.45;
+            font-size: 0.83rem;
+        }
+        .section-heading {
+            margin: 18px 0 12px;
+            padding: 14px 16px;
+            border-left: 4px solid var(--accent);
+            background: rgba(255, 254, 249, 0.72);
+            border-top: 1px solid var(--line);
+            border-right: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+            border-radius: 8px;
+        }
+        .section-heading h2 {
+            margin: 0;
+            font-size: 1.18rem;
+            line-height: 1.3;
+        }
+        .section-heading p {
+            margin: 5px 0 0;
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .result-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 12px 0 8px;
+        }
+        .result-meta span {
+            display: inline-flex;
+            align-items: center;
+            min-height: 27px;
+            padding: 3px 9px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-weight: 650;
+        }
+        .side-note {
+            color: var(--muted);
+            font-size: 0.86rem;
+            line-height: 1.55;
+        }
+        .side-note strong {
+            color: var(--ink);
         }
         @media (max-width: 900px) {
-            .workbench-hero {
-                grid-template-columns: 1fr;
-            }
             .block-container {
                 padding-left: 1rem;
                 padding-right: 1rem;
+            }
+            .workflow-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        @media (max-width: 560px) {
+            .workflow-grid {
+                grid-template-columns: 1fr;
             }
         }
         </style>
@@ -218,9 +304,32 @@ def show_event_table(items: list[dict], file_name: str) -> None:
 
 def render_status_pill(label: str, tone: str = "ok") -> str:
     cls = "status-pill"
-    if tone in {"warn", "bad"}:
+    if tone in {"info", "warn", "bad"}:
         cls = f"{cls} {tone}"
     return f'<span class="{cls}">{label}</span>'
+
+
+def render_section_header(title: str, description: str) -> None:
+    st.markdown(
+        f"""
+        <div class="section-heading">
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_result_meta(items: dict[str, object]) -> None:
+    chips = "".join(f"<span>{key}={value}</span>" for key, value in items.items() if value not in {None, ""})
+    if chips:
+        st.markdown(f'<div class="result-meta">{chips}</div>', unsafe_allow_html=True)
+
+
+def show_api_errors(errors: list[dict], primary_key: str = "股票代码") -> None:
+    for error in errors:
+        st.warning(f"{error.get(primary_key, '')}: {error.get('error', '')}")
 
 
 def render_workbench_header(api_base: str) -> None:
@@ -267,17 +376,21 @@ def render_workbench_header(api_base: str) -> None:
               {render_status_pill("API 正常" if api_tone == "ok" else "API 异常", api_tone)}
               {render_status_pill(f"默认股票池 {watchlist_count} 只", watchlist_tone)}
               {render_status_pill(f"最近运行：{run_status}", run_tone)}
-              {render_status_pill(f"数据源：{health.get('provider', '-') if health else '-'}", "ok" if health else "warn")}
+              {render_status_pill(f"数据源：{health.get('provider', '-') if health else '-'}", "info" if health else "warn")}
             </div>
           </section>
-          <aside class="workbench-panel">
-            <ul class="quick-list">
-              <li><strong>盘中</strong>：先查实时行情和观察提示。</li>
-              <li><strong>收盘后</strong>：执行默认股票池扫描。</li>
-              <li><strong>复盘</strong>：查看止损、目标和后续表现。</li>
-              <li><strong>维护</strong>：股票池、板块和涨停候选单独管理。</li>
-            </ul>
-          </aside>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="workflow-grid">
+          <div class="workflow-step"><span>01 盘中</span><strong>实时行情</strong><p>先看价格、涨跌、成交和盘中提示。</p></div>
+          <div class="workflow-step"><span>02 收盘后</span><strong>今日提醒</strong><p>扫描默认股票池，保留可复盘事件。</p></div>
+          <div class="workflow-step"><span>03 复盘</span><strong>结果验证</strong><p>查看后续表现、止损目标和策略结论。</p></div>
+          <div class="workflow-step"><span>04 维护</span><strong>基础数据</strong><p>维护股票池、板块轮动和涨停候选。</p></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -307,11 +420,13 @@ def main() -> None:
     st.sidebar.caption("改地址后，页面所有操作都会请求新的 API。")
     st.sidebar.divider()
     st.sidebar.markdown(
-        "**常用顺序**\n\n"
-        "1. 实时行情\n"
-        "2. 今日提醒\n"
-        "3. 复盘统计\n"
-        "4. 股票池维护"
+        """
+        <div class="side-note">
+        <strong>建议顺序</strong><br>
+        实时行情 -> 今日提醒 -> 复盘统计 -> 股票池维护
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     render_workbench_header(api_base)
@@ -337,18 +452,19 @@ def main() -> None:
         [
             "资金流",
             "实时行情",
-            "日线信号",
-            "涨停突破",
+            "临时信号",
+            "涨停策略",
             "板块轮动",
-            "今日提醒",
+            "每日任务",
             "历史事件",
-            "复盘统计",
+            "复盘验证",
             "股票池",
-            "THSDK K线",
+            "K线工具",
         ]
     )
 
     with flow_tab:
+        render_section_header("资金流", "按主力净流入做快速排序，用来补充盘中热度判断。")
         codes_text = st.text_area("股票代码（每行一个）", value=DEFAULT_CODES, height=160)
         c1, c2, c3 = st.columns(3)
         min_inflow = c1.number_input("最小主力净流入（元）", min_value=0.0, value=20_000_000.0, step=10_000_000.0)
@@ -370,7 +486,7 @@ def main() -> None:
 
             items = data.get("items", [])
             source = data.get("source", "unknown")
-            st.caption(f"as_of={data.get('as_of', '')} | source={source} | count={len(items)}")
+            render_result_meta({"时间": data.get("as_of", ""), "来源": source, "数量": len(items)})
             if data.get("warning"):
                 st.warning(data["warning"])
             if not items:
@@ -394,7 +510,7 @@ def main() -> None:
             show_downloadable_table(df, "tdx_flow_rank.csv")
 
     with quote_tab:
-        st.caption("快速查看当前价格和涨跌情况；优先使用东方财富，失败时自动尝试腾讯。")
+        render_section_header("实时行情", "快速查看当前价格、涨跌和盘中观察提示；优先使用东方财富，失败时自动尝试腾讯。")
         codes_text = st.text_area("股票代码（每行一个）", value=DEFAULT_CODES, height=160, key="quote_codes")
         c1, c2, c3 = st.columns(3)
         if c1.button("从默认股票池载入", key="quote_load_default_watchlist"):
@@ -437,15 +553,18 @@ def main() -> None:
                 st.stop()
 
         if quote_data is not None:
-            st.caption(
-                f"as_of={quote_data.get('as_of', '')} | source={quote_data.get('source', 'unknown')} | "
-                f"count={quote_data.get('count', 0)} | errors={quote_data.get('error_count', 0)}"
+            render_result_meta(
+                {
+                    "时间": quote_data.get("as_of", ""),
+                    "来源": quote_data.get("source", "unknown"),
+                    "数量": quote_data.get("count", 0),
+                    "错误": quote_data.get("error_count", 0),
+                }
             )
             watchlist_info = quote_data.get("watchlist") or {}
             if watchlist_info:
                 st.caption(f"watchlist={watchlist_info.get('name', '')} | requested={quote_data.get('requested_count', 0)}")
-            for error in quote_data.get("errors", []):
-                st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
+            show_api_errors(quote_data.get("errors", []))
             df = pd.DataFrame(quote_data.get("items", []))
             if df.empty:
                 st.warning("没有取到实时行情。")
@@ -472,7 +591,7 @@ def main() -> None:
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "realtime_quotes.csv")
 
     with signal_tab:
-        st.caption("这里是临时扫描输入股票；如果要沉淀进复盘事件库，请使用“今日提醒”里的默认股票池扫描。")
+        render_section_header("临时信号", "临时输入股票做日线信号扫描；要沉淀进复盘事件库，请使用“每日任务”。")
         codes_text = st.text_area("股票代码（每行一个）", value=DEFAULT_CODES, height=160, key="signal_codes")
         if st.button("从默认股票池载入", key="signal_load_default_watchlist"):
             try:
@@ -520,7 +639,7 @@ def main() -> None:
 
             items = data.get("items", [])
             errors = data.get("errors", [])
-            st.caption(f"as_of={data.get('as_of', '')} | source={data.get('source', 'unknown')} | count={len(items)}")
+            render_result_meta({"时间": data.get("as_of", ""), "来源": data.get("source", "unknown"), "数量": len(items)})
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("扫描股票数", data.get("requested_count", len(items) + len(errors)))
             m2.metric("命中信号数", len(items))
@@ -533,8 +652,7 @@ def main() -> None:
                     f"数据时效={summary.get('freshness_counts', {})} | "
                     f"最高评分={summary.get('max_score', '-')}"
                 )
-            for error in errors:
-                st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
+            show_api_errors(errors)
             if errors and not items and data.get("error_count", 0) == data.get("requested_count", 0):
                 st.error("当前行情源连接不稳定，本次扫描未取回有效日线数据。建议稍后重试，或先缩小扫描范围验证。")
             if not items:
@@ -583,7 +701,7 @@ def main() -> None:
             show_downloadable_table(df, "daily_signal_alerts.csv")
 
     with limit_up_tab:
-        st.caption("扫描每日涨停池，按近期突破、均线状态、连板和封板稳定性筛出候选，并保存到本地库。")
+        render_section_header("涨停策略", "扫描每日涨停池，按突破、均线、连板和封板稳定性筛出候选，并保存到本地库。")
         c1, c2, c3, c4, c5 = st.columns(5)
         limit_trade_date = c1.date_input("交易日", value=pd.Timestamp.now().date(), key="limit_trade_date")
         limit_lookback = int(c2.number_input("回看天数", min_value=30, max_value=1000, value=120, step=10, key="limit_lookback"))
@@ -609,9 +727,8 @@ def main() -> None:
                 st.error(f"扫描失败: {exc}")
                 st.stop()
 
-            st.caption(f"as_of={data.get('as_of', '')} | trade_date={data.get('trade_date', '')} | count={data.get('count', 0)}")
-            for error in data.get("errors", []):
-                st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
+            render_result_meta({"时间": data.get("as_of", ""), "交易日": data.get("trade_date", ""), "数量": data.get("count", 0)})
+            show_api_errors(data.get("errors", []))
             df = pd.DataFrame(data.get("items", []))
             if df.empty:
                 st.warning("当前条件下没有筛出涨停突破候选。")
@@ -647,7 +764,7 @@ def main() -> None:
                 st.stop()
 
             df = pd.DataFrame(data.get("items", []))
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
             if df.empty:
                 st.warning("没有已保存的涨停突破候选。")
             else:
@@ -691,9 +808,8 @@ def main() -> None:
                 st.error(f"回填失败: {exc}")
                 st.stop()
 
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
-            for error in data.get("errors", []):
-                st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
+            show_api_errors(data.get("errors", []))
             df = pd.DataFrame(data.get("items", []))
             if df.empty:
                 st.warning("没有生成新的涨停候选复盘。")
@@ -730,7 +846,7 @@ def main() -> None:
                 st.stop()
 
             df = pd.DataFrame(data.get("items", []))
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
             if df.empty:
                 st.warning("当前条件下没有涨停候选复盘统计。")
             else:
@@ -751,7 +867,7 @@ def main() -> None:
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "limit_up_review_stats.csv")
 
     with sector_tab:
-        st.caption("扫描行业或概念板块，优先找近期活跃、但仍处于相对低位的板块。")
+        render_section_header("板块轮动", "扫描行业或概念板块，优先找近期活跃、但仍处于相对低位的方向。")
         c1, c2, c3, c4 = st.columns(4)
         sector_trade_date = c1.date_input("交易日", value=pd.Timestamp.now().date(), key="sector_trade_date")
         sector_type = c2.selectbox("板块类型", options=["industry", "concept"], format_func=lambda x: "行业" if x == "industry" else "概念")
@@ -775,9 +891,8 @@ def main() -> None:
                 st.error(f"扫描失败: {exc}")
                 st.stop()
 
-            st.caption(f"as_of={data.get('as_of', '')} | trade_date={data.get('trade_date', '')} | count={data.get('count', 0)}")
-            for error in data.get("errors", []):
-                st.warning(f"{error.get('板块', '')}: {error.get('error', '')}")
+            render_result_meta({"时间": data.get("as_of", ""), "交易日": data.get("trade_date", ""), "数量": data.get("count", 0)})
+            show_api_errors(data.get("errors", []), primary_key="板块")
             df = pd.DataFrame(data.get("items", []))
             if df.empty:
                 st.warning("当前条件下没有生成板块轮动快照。")
@@ -809,7 +924,7 @@ def main() -> None:
                 st.stop()
 
             df = pd.DataFrame(data.get("items", []))
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
             if df.empty:
                 st.warning("没有已保存的板块轮动快照。")
             else:
@@ -843,7 +958,7 @@ def main() -> None:
                 st.stop()
 
             df = pd.DataFrame(data.get("items", []))
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
             if df.empty:
                 st.warning("没有可展示的板块轮动趋势。请先扫描并保存几个交易日的板块快照。")
             else:
@@ -862,7 +977,7 @@ def main() -> None:
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "sector_rotation_trends.csv")
 
     with alerts_tab:
-        st.caption("执行每日任务后，新的信号事件会写入 SQLite，并按通知渠道去重，便于后续自动化调度。")
+        render_section_header("每日任务", "正式扫描默认股票池，写入事件库，并按通知渠道去重，适合收盘后固定执行。")
         event_date = st.date_input("交易日", value=pd.Timestamp.now().date(), key="event_date")
         c1, c2, c3, c4 = st.columns(4)
         notification_channel = c1.selectbox(
@@ -906,10 +1021,14 @@ def main() -> None:
                 st.error(f"扫描失败: {exc}")
                 st.stop()
 
-            st.caption(
-                f"as_of={data.get('as_of', '')} | source={data.get('source', 'unknown')} | "
-                f"watchlist={data.get('watchlist', {}).get('name', '')} | "
-                f"min_score={data.get('min_score', '')} | count={data.get('count', 0)}"
+            render_result_meta(
+                {
+                    "时间": data.get("as_of", ""),
+                    "来源": data.get("source", "unknown"),
+                    "股票池": data.get("watchlist", {}).get("name", ""),
+                    "最低评分": data.get("min_score", ""),
+                    "数量": data.get("count", 0),
+                }
             )
             if data.get("scan_run"):
                 st.caption(
@@ -948,8 +1067,7 @@ def main() -> None:
                 )
             for message in data.get("messages", []):
                 st.info(message)
-            for error in data.get("errors", []):
-                st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
+            show_api_errors(data.get("errors", []))
             if data.get("errors") and not data.get("items") and data.get("error_count", 0) == data.get("requested_count", 0):
                 st.error("当前行情源连接不稳定，本次默认股票池扫描未取回有效日线数据。建议稍后重试。")
             if not data.get("items"):
@@ -964,7 +1082,7 @@ def main() -> None:
                 st.error(f"加载失败: {exc}")
                 st.stop()
             runs = pd.DataFrame(data.get("items", []))
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
             if runs.empty:
                 st.warning("还没有扫描运行记录。")
             else:
@@ -982,10 +1100,11 @@ def main() -> None:
                 st.error(f"加载失败: {exc}")
                 st.stop()
 
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
             show_event_table(data.get("items", []), "today_signal_events.csv")
 
     with history_tab:
+        render_section_header("历史事件", "回看已经入库的日线信号事件，用于追踪同一股票或最近扫描结果。")
         c1, c2 = st.columns([2, 1])
         code_filter = c1.text_input("股票代码（可选）", value="")
         limit = int(c2.number_input("返回条数", min_value=1, max_value=500, value=100, step=10, key="history_limit"))
@@ -1005,11 +1124,11 @@ def main() -> None:
                 st.error(f"加载失败: {exc}")
                 st.stop()
 
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
             show_event_table(data.get("items", []), "signal_event_history.csv")
 
     with review_tab:
-        st.caption("先回填事件后的未来表现，再按指定 horizon 聚合成复盘统计。")
+        render_section_header("复盘验证", "先回填事件后的未来表现，再按周期汇总，用来判断策略是否值得继续保留。")
         c1, c2, c3 = st.columns(3)
         review_code = c1.text_input("股票代码过滤（可选）", value="", key="review_code")
         review_date = c2.text_input("交易日过滤（可选）", value="", key="review_date")
@@ -1033,9 +1152,8 @@ def main() -> None:
                 st.error(f"回填失败: {exc}")
                 st.stop()
 
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
-            for error in data.get("errors", []):
-                st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
+            show_api_errors(data.get("errors", []))
             snapshots = pd.DataFrame(data.get("items", []))
             if snapshots.empty:
                 st.warning("没有生成新的复盘快照。")
@@ -1092,7 +1210,7 @@ def main() -> None:
                 st.stop()
 
             stats_df = pd.DataFrame(data.get("items", []))
-            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            render_result_meta({"时间": data.get("as_of", ""), "数量": data.get("count", 0)})
             if stats_df.empty:
                 st.warning("当前条件下没有复盘统计数据。")
             else:
@@ -1132,6 +1250,7 @@ def main() -> None:
                 show_downloadable_table(stats_df, "review_stats.csv")
 
     with watchlist_tab:
+        render_section_header("股票池", "维护默认股票池；每日任务和默认池实时行情都会使用这里保存的列表。")
         try:
             watchlist = request_api(api_base, "/api/watchlists/default", method="GET")
             current_codes_text = "\n".join(str(item.get("code", "")) for item in watchlist.get("items", []))
@@ -1203,6 +1322,7 @@ def main() -> None:
                 st.success(f"已初始化默认股票池，共 {data.get('count', 0)} 只股票。")
 
     with kline_tab:
+        render_section_header("K线工具", "直接查询 THSDK K 线，用于核对底层行情连接和单只股票历史数据。")
         c1, c2 = st.columns([2, 1])
         symbol = c1.text_input("THSDK 代码", value=DEFAULT_THSDK_SYMBOL)
         count = int(c2.number_input("K线数量", min_value=1, max_value=2000, value=20, step=1))
@@ -1219,7 +1339,7 @@ def main() -> None:
                 st.stop()
 
             items = data.get("items", [])
-            st.caption(f"as_of={data.get('as_of', '')} | source={data.get('source', 'unknown')} | count={len(items)}")
+            render_result_meta({"时间": data.get("as_of", ""), "来源": data.get("source", "unknown"), "数量": len(items)})
             if not items:
                 st.warning("没有命中数据。")
                 st.stop()
