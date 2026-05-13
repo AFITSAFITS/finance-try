@@ -192,10 +192,12 @@ python scripts/get_stock_data.py daily-signals \
 python scripts/run_daily_scan.py --channel stdout
 python scripts/run_daily_scan.py --channel feishu_webhook
 python scripts/run_daily_scan.py --min-score 60
+python scripts/run_daily_scan.py --review-after-scan --review-summary-horizon T+3
 ```
 
 每日任务默认只保存和通知评分 60 以上的信号；如果想保留全部信号，可以设置 `--min-score 0`。
 同一只股票同一天如果触发多个信号，系统会保存全部事件用于复盘，但通知只发送一条代表信号，避免重复刷屏。
+如果希望日常扫描后顺手积累复盘结果，可以加 `--review-after-scan`；需要限制复盘范围时，可以配合 `--review-trade-date`。
 
 ### 常驻任务进程
 

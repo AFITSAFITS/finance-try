@@ -12,7 +12,13 @@ if str(ROOT_DIR) not in sys.path:
 
 from app import notification_service
 from app.api import select_newly_delivered_events
+from app import review_service
 from app import scan_workflow
+
+
+def parse_horizon_args(raw: str) -> list[int]:
+    values = [item.strip() for item in raw.split(",") if item.strip()]
+    return [int(item) for item in values]
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,6 +37,29 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=float(os.getenv("AI_FINANCE_DAILY_MIN_SCORE", "60")),
         help="Minimum signal score to persist and notify; use 0 to keep all signals",
+    )
+    parser.add_argument(
+        "--review-after-scan",
+        action="store_true",
+        help="Backfill matured signal review snapshots after the daily scan",
+    )
+    parser.add_argument(
+        "--review-trade-date",
+        type=str,
+        default="",
+        help="Optional trade date filter for review backfill, e.g. 2026-05-12",
+    )
+    parser.add_argument(
+        "--review-horizons",
+        type=str,
+        default="1,3,5",
+        help="Comma-separated review horizons for --review-after-scan",
+    )
+    parser.add_argument(
+        "--review-summary-horizon",
+        type=str,
+        default="T+3",
+        help="Summary horizon label after review backfill, e.g. T+3",
     )
     return parser.parse_args()
 
@@ -94,6 +123,39 @@ def main() -> int:
 
     for error in result["errors"]:
         print(f"WARNING [{error.get('股票代码', '')}]: {error.get('error', '')}", file=sys.stderr)
+
+    if args.review_after_scan:
+        try:
+            review_result = review_service.backfill_review_snapshots(
+                trade_date=args.review_trade_date.strip() or None,
+                horizons=parse_horizon_args(args.review_horizons),
+                adjust=args.adjust,
+            )
+            review_stats = review_service.summarize_review_stats(
+                horizon=args.review_summary_horizon.strip() or "T+3",
+                trade_date=args.review_trade_date.strip() or None,
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"ERROR [review]: {exc}", file=sys.stderr)
+            return 1
+
+        print(f"review_snapshots={review_result['count']}")
+        for error in review_result["errors"]:
+            print(f"WARNING [review {error.get('股票代码', '')}]: {error.get('error', '')}", file=sys.stderr)
+        if review_stats:
+            for item in review_stats:
+                print(
+                    "review_summary "
+                    f"horizon={item['horizon']} "
+                    f"samples={item['sample_count']} "
+                    f"avg_return={item['avg_return']} "
+                    f"win_rate={item['win_rate']} "
+                    f"verdict={item['strategy_verdict']} "
+                    f"confidence={item['strategy_confidence']} "
+                    f"actionable={item['strategy_actionable']}"
+                )
+        else:
+            print("没有可用的复盘统计结果。")
 
     return 0
 
