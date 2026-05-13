@@ -1336,6 +1336,7 @@ def main() -> None:
                     f"未复盘={review_backlog.get('missing_count', 0)} | "
                     f"已到期未复盘={review_backlog.get('due_missing_count', 0)} | "
                     f"未到期={review_backlog.get('not_due_count', 0)} | "
+                    f"下次复盘日期={review_backlog.get('next_due_date', '') or '-'} | "
                     f"覆盖率={review_backlog.get('reviewed_ratio')}"
                 )
             strategy_df = pd.DataFrame(data.get("items", []))

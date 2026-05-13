@@ -36,6 +36,10 @@ def _review_due_cutoff(horizon: str) -> str:
     return (datetime.now() - timedelta(days=_horizon_days(horizon))).strftime("%Y-%m-%d")
 
 
+def _review_due_date(trade_date: str, horizon: str) -> str:
+    return (datetime.strptime(str(trade_date), "%Y-%m-%d") + timedelta(days=_horizon_days(horizon))).strftime("%Y-%m-%d")
+
+
 def _signal_strategy_name(item: dict[str, Any]) -> str:
     parts = [
         str(item.get("score_bucket", "") or "").strip(),
@@ -201,6 +205,19 @@ def _summarize_signal_review_backlog(
             """,
             (horizon, *params, max(1, int(limit))),
         ).fetchall()
+        next_due_row = conn.execute(
+            f"""
+            SELECT e.trade_date
+            FROM signal_events e
+            {join_sql}
+            {where_sql}
+              {"AND" if where_sql else "WHERE"} r.id IS NULL
+              AND e.trade_date > ?
+            ORDER BY e.trade_date ASC, e.id ASC
+            LIMIT 1
+            """,
+            (horizon, *params, due_cutoff),
+        ).fetchone()
     total = int(row["total_count"] or 0) if row else 0
     reviewed = int(row["reviewed_count"] or 0) if row else 0
     missing = int(row["missing_count"] or 0) if row else 0
@@ -213,6 +230,7 @@ def _summarize_signal_review_backlog(
         "due_missing_count": due_missing,
         "not_due_count": not_due,
         "due_cutoff": due_cutoff,
+        "next_due_date": _review_due_date(next_due_row["trade_date"], horizon) if next_due_row else "",
         "reviewed_ratio": round(reviewed / total, 4) if total else None,
         "latest_missing": [dict(item) for item in missing_rows],
     }
@@ -259,6 +277,19 @@ def _summarize_limit_up_review_backlog(
             """,
             (horizon, *params, max(1, int(limit))),
         ).fetchall()
+        next_due_row = conn.execute(
+            f"""
+            SELECT c.trade_date
+            FROM limit_up_candidates c
+            {join_sql}
+            {where_sql}
+              {"AND" if where_sql else "WHERE"} r.id IS NULL
+              AND c.trade_date > ?
+            ORDER BY c.trade_date ASC, c.id ASC
+            LIMIT 1
+            """,
+            (horizon, *params, due_cutoff),
+        ).fetchone()
     total = int(row["total_count"] or 0) if row else 0
     reviewed = int(row["reviewed_count"] or 0) if row else 0
     missing = int(row["missing_count"] or 0) if row else 0
@@ -271,6 +302,7 @@ def _summarize_limit_up_review_backlog(
         "due_missing_count": due_missing,
         "not_due_count": not_due,
         "due_cutoff": due_cutoff,
+        "next_due_date": _review_due_date(next_due_row["trade_date"], horizon) if next_due_row else "",
         "reviewed_ratio": round(reviewed / total, 4) if total else None,
         "latest_missing": [dict(item) for item in missing_rows],
     }
@@ -289,6 +321,11 @@ def summarize_review_backlog(
     missing_count = int(signal_backlog["missing_count"]) + int(limit_up_backlog["missing_count"])
     due_missing_count = int(signal_backlog["due_missing_count"]) + int(limit_up_backlog["due_missing_count"])
     not_due_count = int(signal_backlog["not_due_count"]) + int(limit_up_backlog["not_due_count"])
+    next_due_dates = [
+        str(item.get("next_due_date", ""))
+        for item in [signal_backlog, limit_up_backlog]
+        if str(item.get("next_due_date", "")).strip()
+    ]
     return {
         "horizon": horizon,
         "total_count": total_count,
@@ -297,6 +334,7 @@ def summarize_review_backlog(
         "due_missing_count": due_missing_count,
         "not_due_count": not_due_count,
         "due_cutoff": _review_due_cutoff(horizon),
+        "next_due_date": min(next_due_dates) if next_due_dates else "",
         "reviewed_ratio": round(reviewed_count / total_count, 4) if total_count else None,
         "signals": signal_backlog,
         "limit_up": limit_up_backlog,

@@ -692,6 +692,7 @@ def test_strategy_summary_api(monkeypatch) -> None:
                 "missing_count": 0,
                 "due_missing_count": 0,
                 "not_due_count": 0,
+                "next_due_date": "",
                 "reviewed_ratio": 1.0,
             },
             "items": [
@@ -732,6 +733,7 @@ def test_strategy_summary_api(monkeypatch) -> None:
     assert body["sample_gap_summary"]["needs_more_samples_count"] == 0
     assert body["review_backlog"]["missing_count"] == 0
     assert body["review_backlog"]["due_missing_count"] == 0
+    assert body["review_backlog"]["next_due_date"] == ""
     assert body["items"][0]["strategy_verdict"] == "保留"
 
 
