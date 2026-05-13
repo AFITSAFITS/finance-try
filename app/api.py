@@ -80,6 +80,10 @@ class RunDailyJobRequest(BaseModel):
     channel: str = "stdout"
     max_workers: int = Field(default=8, ge=1, le=32)
     min_score: float = Field(default=60, ge=0, le=100)
+    review_after_scan: bool = False
+    review_trade_date: str = ""
+    review_horizons: list[int] = Field(default_factory=lambda: [1, 3, 5])
+    review_summary_horizon: str = "T+3"
 
 
 class BackfillReviewsRequest(BaseModel):
@@ -432,6 +436,22 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             max_workers=int(req.max_workers),
             min_score=float(req.min_score),
         )
+        review_result: dict[str, Any] | None = None
+        review_stats: list[dict[str, Any]] = []
+        review_error = ""
+        if req.review_after_scan:
+            try:
+                review_result = review_service.backfill_review_snapshots(
+                    trade_date=req.review_trade_date.strip() or None,
+                    horizons=review_service.parse_horizons(req.review_horizons),
+                    adjust=req.adjust.strip(),
+                )
+                review_stats = review_service.summarize_review_stats(
+                    horizon=req.review_summary_horizon.strip() or "T+3",
+                    trade_date=req.review_trade_date.strip() or None,
+                )
+            except Exception as exc:  # noqa: BLE001
+                review_error = str(exc)
         return {
             "as_of": tdx_service.now_ts(),
             "count": len(result["persisted_events"]),
@@ -445,6 +465,10 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             "items": result["persisted_events"],
             "deliveries": result["delivery_results"],
             "errors": result["errors"],
+            "review_after_scan": req.review_after_scan,
+            "review_result": review_result or {},
+            "review_stats": review_stats,
+            "review_error": review_error,
             "source": "akshare",
             "watchlist": {
                 "id": result["watchlist"].get("id"),

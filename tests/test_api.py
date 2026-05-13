@@ -445,6 +445,58 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
     assert body["scan_run"]["status"] == "正常"
     assert body["deliveries"][0]["channel"] == "stdout"
     assert body["errors"][0]["股票代码"] == "000001"
+    assert body["review_after_scan"] is False
+
+
+def test_run_daily_job_can_review_after_scan(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+    review_called: dict[str, object] = {}
+
+    def fake_run_default_watchlist_scan(**kwargs):
+        return {
+            "watchlist": {"name": "默认股票池", "count": 1},
+            "persisted_events": [],
+            "delivery_results": [],
+            "errors": [],
+            "requested_count": 1,
+            "elapsed_seconds": 1.2,
+            "min_score": kwargs["min_score"],
+            "signal_summary": {},
+            "scan_run": {"id": 8, "run_at": "2026-05-13 11:35:00", "status": "无信号", "note": "没有新信号"},
+        }
+
+    def fake_backfill_review_snapshots(**kwargs):
+        review_called["backfill"] = kwargs
+        return {"count": 2, "errors": []}
+
+    def fake_summarize_review_stats(**kwargs):
+        review_called["stats"] = kwargs
+        return [{"sample_count": 6, "strategy_confidence": "中"}]
+
+    monkeypatch.setattr(api_module.scan_workflow, "run_default_watchlist_scan", fake_run_default_watchlist_scan)
+    monkeypatch.setattr(api_module.review_service, "backfill_review_snapshots", fake_backfill_review_snapshots)
+    monkeypatch.setattr(api_module.review_service, "summarize_review_stats", fake_summarize_review_stats)
+
+    resp = client.post(
+        "/api/signals/run-daily-job",
+        json={
+            "channel": "stdout",
+            "review_after_scan": True,
+            "review_trade_date": "2026-05-01",
+            "review_horizons": [1, 3],
+            "review_summary_horizon": "T+3",
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["review_after_scan"] is True
+    assert body["review_result"]["count"] == 2
+    assert body["review_stats"][0]["strategy_confidence"] == "中"
+    assert body["review_error"] == ""
+    assert review_called["backfill"]["trade_date"] == "2026-05-01"
+    assert review_called["backfill"]["horizons"] == [1, 3]
+    assert review_called["stats"]["horizon"] == "T+3"
 
 
 def test_scan_runs_api(monkeypatch) -> None:

@@ -866,16 +866,34 @@ def main() -> None:
         )
         job_workers = int(c3.number_input("任务并发数", min_value=1, max_value=32, value=8, step=1, key="job_workers"))
         job_min_score = float(c4.number_input("最低评分", min_value=0.0, max_value=100.0, value=60.0, step=5.0, key="job_min_score"))
+        review_after_scan = st.checkbox("扫描后复盘已到期信号", value=False, key="job_review_after_scan")
+        review_trade_date = ""
+        review_horizons = "1,3,5"
+        review_summary_horizon = "T+3"
+        if review_after_scan:
+            r1, r2, r3 = st.columns(3)
+            review_trade_date = r1.text_input("复盘交易日过滤（可选）", value="", key="job_review_trade_date")
+            review_horizons = r2.text_input("复盘周期", value="1,3,5", key="job_review_horizons")
+            review_summary_horizon = r3.selectbox("复盘统计周期", options=["T+1", "T+3", "T+5"], index=1, key="job_review_summary_horizon")
         if notification_channel == "feishu_webhook":
             st.info("会向飞书机器人地址推送新事件。需要先在运行环境里配置 webhook。")
 
         if c2.button("执行每日任务", type="primary"):
+            payload = {
+                "channel": notification_channel,
+                "max_workers": job_workers,
+                "min_score": job_min_score,
+                "review_after_scan": review_after_scan,
+                "review_trade_date": review_trade_date.strip(),
+                "review_horizons": [int(item.strip()) for item in review_horizons.split(",") if item.strip()],
+                "review_summary_horizon": review_summary_horizon,
+            }
             try:
                 data = request_api(
                     api_base,
                     "/api/signals/run-daily-job",
-                    payload={"channel": notification_channel, "max_workers": job_workers, "min_score": job_min_score},
-                    timeout_seconds=600,
+                    payload=payload,
+                    timeout_seconds=900,
                 )
             except Exception as exc:  # noqa: BLE001
                 st.error(f"扫描失败: {exc}")
@@ -899,6 +917,15 @@ def main() -> None:
             m3.metric("错误数", data.get("error_count", len(data.get("errors", []))))
             m4.metric("耗时(秒)", data.get("elapsed_seconds", ""))
             st.caption(f"本次代表通知数={data.get('notification_count', len(data.get('deliveries', [])))}")
+            if data.get("review_after_scan"):
+                review_result = data.get("review_result") or {}
+                review_stats = data.get("review_stats") or []
+                if data.get("review_error"):
+                    st.warning(f"复盘失败: {data.get('review_error')}")
+                else:
+                    st.caption(f"复盘快照={review_result.get('count', 0)} | 复盘统计={len(review_stats)}")
+                    if review_stats:
+                        show_downloadable_table(pd.DataFrame(review_stats), "daily_job_review_stats.csv")
             summary = data.get("signal_summary", {}) if isinstance(data.get("signal_summary"), dict) else {}
             if summary:
                 st.caption(
