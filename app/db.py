@@ -158,6 +158,23 @@ CREATE TABLE IF NOT EXISTS limit_up_review_snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_limit_up_review_horizon ON limit_up_review_snapshots(horizon);
+
+CREATE TABLE IF NOT EXISTS scan_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_at TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    watchlist_name TEXT NOT NULL DEFAULT '',
+    watchlist_source TEXT NOT NULL DEFAULT '',
+    requested_count INTEGER NOT NULL DEFAULT 0,
+    event_count INTEGER NOT NULL DEFAULT 0,
+    notification_count INTEGER NOT NULL DEFAULT 0,
+    error_count INTEGER NOT NULL DEFAULT 0,
+    elapsed_seconds REAL,
+    min_score REAL,
+    summary_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_scan_runs_run_at ON scan_runs(run_at);
 """
 
 MIGRATIONS_SQL = [

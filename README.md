@@ -50,6 +50,7 @@
   - 涨停突破写入 `limit_up_candidates`
   - 涨停候选复盘写入 `limit_up_review_snapshots`
   - 板块轮动写入 `sector_rotation_snapshots`
+  - 每日扫描运行记录写入 `scan_runs`
 - 页面与接口
   - FastAPI API
   - Streamlit 页面
@@ -173,6 +174,7 @@ python scripts/get_stock_data.py daily-signals --codes-file codes.txt --min-scor
 偏多信号会给出参考止损和参考目标；止损距离过大时会降低评分并提示风险。
 日线信号入库后会同步保存评分信息和观察结论，复盘统计会按评分区间和观察结论汇总，方便观察高分信号、重点观察信号后续表现是否更稳定。
 命令行和每日任务会输出 `signal_summary`，快速汇总命中数、最高评分、观察结论分布和数据时效分布。
+每日任务会保存扫描运行记录，方便回看每次是否成功运行、命中多少、错误多少、有没有数据滞后。
 默认会限制单个行情源的最长等待时间，避免某个外部数据源卡住整批扫描。可以用 `AI_FINANCE_PROVIDER_TIMEOUT_SECONDS` 调整，默认 12 秒。
 日线扫描会复用当天已抓取的本地 K 线缓存；缓存不足时才重新请求外部行情源。
 

@@ -38,7 +38,8 @@ def test_select_representative_notification_events_keeps_one_per_stock_date() ->
     assert [item["id"] for item in selected] == [2, 3]
 
 
-def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch) -> None:
+def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
     def fake_ensure_default_watchlist():
         return {
             "name": "默认股票池",
@@ -99,6 +100,8 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch) -> N
     assert [item["id"] for item in result["persisted_events"]] == [1, 2]
     assert result["signal_summary"]["observation_counts"] == {"重点观察": 1}
     assert result["signal_summary"]["freshness_counts"] == {"最近交易日": 1}
+    assert result["scan_run"]["event_count"] == 2
+    assert result["scan_run"]["summary"]["signals"] == 1
     assert [item["id"] for item in result["notification_events"]] == [2]
     assert delivered["ids"] == [2]
     assert result["watchlist_source"] == "seed"

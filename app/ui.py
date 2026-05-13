@@ -657,6 +657,11 @@ def main() -> None:
                 f"watchlist={data.get('watchlist', {}).get('name', '')} | "
                 f"min_score={data.get('min_score', '')} | count={data.get('count', 0)}"
             )
+            if data.get("scan_run"):
+                st.caption(
+                    f"运行记录 ID={data['scan_run'].get('id', '')} | "
+                    f"记录时间={data['scan_run'].get('run_at', '')}"
+                )
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("扫描股票数", data.get("requested_count", 0))
             m2.metric("新增事件数", data.get("count", 0))
@@ -680,6 +685,19 @@ def main() -> None:
                 st.warning("这次扫描没有产生新的入库事件。")
             else:
                 show_event_table(data["items"], "today_signal_events.csv")
+
+        if st.button("加载最近扫描记录"):
+            try:
+                data = request_api(api_base, "/api/signals/scan-runs", method="GET", params={"limit": 20})
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"加载失败: {exc}")
+                st.stop()
+            runs = pd.DataFrame(data.get("items", []))
+            st.caption(f"as_of={data.get('as_of', '')} | count={data.get('count', 0)}")
+            if runs.empty:
+                st.warning("还没有扫描运行记录。")
+            else:
+                show_downloadable_table(runs, "scan_runs.csv")
 
         if c1.button("刷新当日事件"):
             try:

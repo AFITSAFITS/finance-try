@@ -41,6 +41,7 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
                 "observation_counts": {"重点观察": 1, "谨慎观察": 1},
                 "freshness_counts": {"最近交易日": 2},
             },
+            "scan_run": {"id": 3, "run_at": "2026-05-13 11:35:00"},
             "errors": [{"股票代码": "000001", "error": "network timeout"}],
         }
 
@@ -58,6 +59,7 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
     assert called["min_score"] == 70.0
     assert "min_score=70.0" in captured.out
     assert "signal_summary" in captured.out
+    assert "scan_run_id=3" in captured.out
     assert "stale_signals=0" in captured.out
     assert "默认股票池" in captured.out
     assert "MACD金叉" in captured.out

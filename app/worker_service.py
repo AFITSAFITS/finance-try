@@ -84,6 +84,7 @@ def run_worker_loop(
                 f"count={result.get('requested_count', 0)} "
                 f"events={len(result.get('persisted_events', []))} "
                 f"notification_events={len(result.get('notification_events', []))} "
+                f"scan_run_id={(result.get('scan_run') or {}).get('id', '')} "
                 f"min_score={result.get('min_score', '')} "
                 f"stale_signals={summary.get('stale_signals', 0) if isinstance(summary, dict) else 0} "
                 f"errors={len(result.get('errors', []))}"

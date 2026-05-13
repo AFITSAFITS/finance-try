@@ -6,6 +6,7 @@ from typing import Any
 from app import bar_service
 from app import event_service
 from app import notification_service
+from app import scan_run_service
 from app import signal_service
 from app import watchlist_service
 
@@ -73,12 +74,25 @@ def run_default_watchlist_scan(
         channel=channel,
     )
     signal_summary = signal_service.summarize_signal_rows(signal_rows, errors)
+    scan_run = scan_run_service.persist_scan_run(
+        channel=channel,
+        watchlist=watchlist,
+        watchlist_source=str(watchlist.get("source", "existing")),
+        requested_count=len(codes),
+        event_count=len(persisted_events),
+        notification_count=len(notification_events),
+        error_count=len(errors),
+        elapsed_seconds=round(time.perf_counter() - started_at, 3),
+        min_score=min_score,
+        signal_summary=signal_summary,
+    )
     return {
         "watchlist": watchlist,
         "requested_count": len(codes),
-        "elapsed_seconds": round(time.perf_counter() - started_at, 3),
+        "elapsed_seconds": scan_run["elapsed_seconds"],
         "min_score": min_score,
         "signal_summary": signal_summary,
+        "scan_run": scan_run,
         "persisted_events": persisted_events,
         "notification_events": notification_events,
         "delivery_results": delivery_results,

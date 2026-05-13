@@ -12,6 +12,7 @@ from app import limit_up_service
 from app import notification_service
 from app import realtime_quote_service
 from app import review_service
+from app import scan_run_service
 from app import scan_workflow
 from app import sector_rotation_service
 from app import signal_service
@@ -439,6 +440,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             "elapsed_seconds": result.get("elapsed_seconds"),
             "min_score": result.get("min_score"),
             "signal_summary": result.get("signal_summary", {}),
+            "scan_run": result.get("scan_run", {}),
             "notification_count": len(result.get("notification_events", [])),
             "items": result["persisted_events"],
             "deliveries": result["delivery_results"],
@@ -461,6 +463,19 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/signals/scan-runs")
+def api_list_scan_runs(limit: int = 50) -> dict[str, Any]:
+    try:
+        items = scan_run_service.list_scan_runs(limit=limit)
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(items),
+            "items": items,
+        }
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
 
