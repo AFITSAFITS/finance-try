@@ -47,12 +47,15 @@ def build_scan_run_health(
 ) -> dict[str, str]:
     signals = int(signal_summary.get("signals") or 0)
     stale_signals = int(signal_summary.get("stale_signals") or 0)
+    cache_fallback_signals = int(signal_summary.get("cache_fallback_signals") or 0)
     if requested_count > 0 and error_count >= requested_count:
         return {"status": "失败", "note": "全部股票扫描失败"}
     if error_count > 0:
         return {"status": "部分失败", "note": f"{error_count} 只股票扫描失败"}
     if stale_signals > 0:
         return {"status": "数据滞后", "note": f"{stale_signals} 条信号数据可能滞后"}
+    if cache_fallback_signals > 0:
+        return {"status": "缓存兜底", "note": f"{cache_fallback_signals} 条信号使用旧缓存兜底"}
     if signals == 0 or event_count == 0:
         return {"status": "无信号", "note": "本次没有命中可保存信号"}
     return {"status": "正常", "note": "扫描完成并生成信号"}

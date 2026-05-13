@@ -48,6 +48,14 @@ def test_build_scan_run_health_statuses() -> None:
         error_count=0,
         signal_summary={"signals": 1, "stale_signals": 1},
     )["status"] == "数据滞后"
+    cache_fallback = scan_run_service.build_scan_run_health(
+        requested_count=2,
+        event_count=1,
+        error_count=0,
+        signal_summary={"signals": 1, "stale_signals": 0, "cache_fallback_signals": 1},
+    )
+    assert cache_fallback["status"] == "缓存兜底"
+    assert cache_fallback["note"] == "1 条信号使用旧缓存兜底"
     assert scan_run_service.build_scan_run_health(
         requested_count=2,
         event_count=0,
