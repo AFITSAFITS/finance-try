@@ -1311,6 +1311,23 @@ def main() -> None:
                     f"结论分布={verdict_counts} | 可信度={confidence_counts} | "
                     f"策略类型={type_counts} | 数据来源={source_counts} | 下一步动作={action_counts}"
                 )
+            sample_gap_summary = data.get("sample_gap_summary") or {}
+            if sample_gap_summary:
+                st.caption(
+                    f"待积累分组={sample_gap_summary.get('needs_more_samples_count', 0)} | "
+                    f"合计还差样本={sample_gap_summary.get('total_samples_to_actionable', 0)}"
+                )
+                gap_df = pd.DataFrame(sample_gap_summary.get("nearest_to_actionable", []))
+                if not gap_df.empty:
+                    gap_cols = [
+                        "strategy_type",
+                        "strategy_name",
+                        "sample_count",
+                        "samples_to_actionable",
+                        "data_source",
+                        "strategy_next_action",
+                    ]
+                    st.dataframe(gap_df[[c for c in gap_cols if c in gap_df.columns]], use_container_width=True)
             strategy_df = pd.DataFrame(data.get("items", []))
             if strategy_df.empty:
                 st.warning("当前还没有可展示的策略结论。请先回填复盘结果。")

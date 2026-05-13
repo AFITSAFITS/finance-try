@@ -195,8 +195,18 @@ def main() -> int:
             f"data_source={strategy_summary['data_source']} | "
             f"verdicts={strategy_summary['verdict_counts']} | confidence={strategy_summary['confidence_counts']} | "
             f"types={strategy_summary['strategy_type_counts']} | sources={strategy_summary['data_source_counts']} | "
-            f"actions={strategy_summary['next_action_counts']}"
+            f"actions={strategy_summary['next_action_counts']} | "
+            f"sample_gaps={strategy_summary.get('sample_gap_summary', {})}"
         )
+        sample_gap_summary = strategy_summary.get("sample_gap_summary") or {}
+        for gap_item in sample_gap_summary.get("nearest_to_actionable", []):
+            print(
+                f"sample_gap type={gap_item['strategy_type']} | name={gap_item['strategy_name']} | "
+                f"horizon={gap_item['horizon']} | data_source={gap_item['data_source']} | "
+                f"samples={gap_item['sample_count']} | "
+                f"samples_to_actionable={gap_item['samples_to_actionable']} | "
+                f"next_action={gap_item['strategy_next_action']}"
+            )
         items = strategy_summary.get("items", [])
         if not items:
             print("没有可用的统一策略结论。")

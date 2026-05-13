@@ -685,6 +685,7 @@ def test_strategy_summary_api(monkeypatch) -> None:
             "strategy_type_counts": {"日线信号": 1},
             "data_source_counts": {"本地缓存": 1},
             "next_action_counts": {"保留该分组": 1},
+            "sample_gap_summary": {"needs_more_samples_count": 0, "total_samples_to_actionable": 0, "nearest_to_actionable": []},
             "items": [
                 {
                     "strategy_type": "日线信号",
@@ -720,6 +721,7 @@ def test_strategy_summary_api(monkeypatch) -> None:
     assert body["strategy_type_counts"] == {"日线信号": 1}
     assert body["data_source_counts"] == {"本地缓存": 1}
     assert body["next_action_counts"] == {"保留该分组": 1}
+    assert body["sample_gap_summary"]["needs_more_samples_count"] == 0
     assert body["items"][0]["strategy_verdict"] == "保留"
 
 

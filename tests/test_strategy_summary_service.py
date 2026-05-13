@@ -78,6 +78,9 @@ def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> N
     assert result["strategy_type_counts"] == {"日线信号": 2, "涨停策略": 1}
     assert result["data_source_counts"] == {"本地缓存": 2, "旧缓存兜底": 1}
     assert result["next_action_counts"] == {"保留该分组": 1, "继续积累样本": 1, "降低权重": 1}
+    assert result["sample_gap_summary"]["needs_more_samples_count"] == 1
+    assert result["sample_gap_summary"]["total_samples_to_actionable"] == 3
+    assert result["sample_gap_summary"]["nearest_to_actionable"][0]["strategy_name"] == "40-60 / 偏空 / 风险回避 / MACD死叉"
     assert [item["strategy_verdict"] for item in result["items"]] == ["保留", "降权", "样本不足"]
     assert result["items"][0]["strategy_type"] == "日线信号"
     assert result["items"][0]["strategy_name"] == "60-80 / 偏多 / 谨慎观察 / MACD金叉"
@@ -177,4 +180,6 @@ def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch
     assert result["strategy_type_counts"] == {"日线信号": 1}
     assert result["data_source_counts"] == {"本地缓存": 1}
     assert result["next_action_counts"] == {"未标记": 1}
+    assert result["sample_gap_summary"]["needs_more_samples_count"] == 0
+    assert result["sample_gap_summary"]["nearest_to_actionable"] == []
     assert [item["strategy_name"] for item in result["items"]] == ["60-80 / 偏多 / 正常观察 / 信号A"]

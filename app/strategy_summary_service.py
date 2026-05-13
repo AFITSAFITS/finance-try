@@ -102,6 +102,35 @@ def _count_by(items: list[dict[str, Any]], key: str) -> dict[str, int]:
     return counts
 
 
+def _build_sample_gap_summary(items: list[dict[str, Any]], limit: int = 3) -> dict[str, Any]:
+    gap_items = [item for item in items if int(item.get("samples_to_actionable", 0) or 0) > 0]
+    gap_items.sort(
+        key=lambda item: (
+            int(item.get("samples_to_actionable", 0) or 0),
+            -int(item.get("sample_count", 0) or 0),
+            str(item.get("strategy_type", "")),
+            str(item.get("strategy_name", "")),
+        )
+    )
+    nearest = [
+        {
+            "strategy_type": item.get("strategy_type", ""),
+            "strategy_name": item.get("strategy_name", ""),
+            "horizon": item.get("horizon", ""),
+            "data_source": item.get("data_source", ""),
+            "sample_count": int(item.get("sample_count", 0) or 0),
+            "samples_to_actionable": int(item.get("samples_to_actionable", 0) or 0),
+            "strategy_next_action": item.get("strategy_next_action", ""),
+        }
+        for item in gap_items[: max(1, int(limit))]
+    ]
+    return {
+        "needs_more_samples_count": len(gap_items),
+        "total_samples_to_actionable": sum(int(item.get("samples_to_actionable", 0) or 0) for item in gap_items),
+        "nearest_to_actionable": nearest,
+    }
+
+
 def summarize_strategy_decisions(
     horizon: str = "T+3",
     trade_date: str | None = None,
@@ -153,5 +182,6 @@ def summarize_strategy_decisions(
         "strategy_type_counts": _count_by(items, "strategy_type"),
         "data_source_counts": _count_by(items, "data_source"),
         "next_action_counts": _count_by(items, "strategy_next_action"),
+        "sample_gap_summary": _build_sample_gap_summary(items),
         "items": limited,
     }
