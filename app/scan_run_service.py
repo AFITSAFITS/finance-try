@@ -34,6 +34,10 @@ def _row_to_scan_run(row: Any) -> dict[str, Any]:
         "min_score": row["min_score"],
         "status": status,
         "note": note,
+        "review_after_scan": bool(row["review_after_scan"]),
+        "review_snapshot_count": row["review_snapshot_count"],
+        "review_stats_count": row["review_stats_count"],
+        "review_error": row["review_error"],
         "summary": summary,
     }
 
@@ -112,7 +116,8 @@ def persist_scan_run(
             """
             SELECT id, run_at, channel, watchlist_name, watchlist_source,
                    requested_count, event_count, notification_count, error_count,
-                   elapsed_seconds, min_score, status, note, summary_json
+                   elapsed_seconds, min_score, status, note, review_after_scan,
+                   review_snapshot_count, review_stats_count, review_error, summary_json
             FROM scan_runs
             WHERE id = ?
             """,
@@ -128,7 +133,8 @@ def list_scan_runs(limit: int = 50) -> list[dict[str, Any]]:
             """
             SELECT id, run_at, channel, watchlist_name, watchlist_source,
                    requested_count, event_count, notification_count, error_count,
-                   elapsed_seconds, min_score, status, note, summary_json
+                   elapsed_seconds, min_score, status, note, review_after_scan,
+                   review_snapshot_count, review_stats_count, review_error, summary_json
             FROM scan_runs
             ORDER BY id DESC
             LIMIT ?
@@ -136,3 +142,45 @@ def list_scan_runs(limit: int = 50) -> list[dict[str, Any]]:
             (int(limit),),
         ).fetchall()
     return [_row_to_scan_run(row) for row in rows]
+
+
+def update_scan_run_review(
+    scan_run_id: int | str | None,
+    *,
+    review_after_scan: bool,
+    review_snapshot_count: int = 0,
+    review_stats_count: int = 0,
+    review_error: str = "",
+) -> dict[str, Any] | None:
+    if scan_run_id is None:
+        return None
+    with db.get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE scan_runs
+            SET review_after_scan = ?,
+                review_snapshot_count = ?,
+                review_stats_count = ?,
+                review_error = ?
+            WHERE id = ?
+            """,
+            (
+                1 if review_after_scan else 0,
+                int(review_snapshot_count),
+                int(review_stats_count),
+                str(review_error or ""),
+                int(scan_run_id),
+            ),
+        )
+        row = conn.execute(
+            """
+            SELECT id, run_at, channel, watchlist_name, watchlist_source,
+                   requested_count, event_count, notification_count, error_count,
+                   elapsed_seconds, min_score, status, note, review_after_scan,
+                   review_snapshot_count, review_stats_count, review_error, summary_json
+            FROM scan_runs
+            WHERE id = ?
+            """,
+            (int(scan_run_id),),
+        ).fetchone()
+    return _row_to_scan_run(row) if row is not None else None

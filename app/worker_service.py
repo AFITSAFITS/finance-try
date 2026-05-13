@@ -6,6 +6,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from app import review_service
+from app import scan_run_service
 from app import scan_workflow
 
 
@@ -74,6 +75,29 @@ def run_single_scan_job(
         result["review_stats"] = review_stats
     except Exception as exc:  # noqa: BLE001
         result["review_error"] = str(exc)
+    scan_run = result.get("scan_run") if isinstance(result.get("scan_run"), dict) else {}
+    result["scan_run"] = scan_run
+    review_result = result.get("review_result") if isinstance(result.get("review_result"), dict) else {}
+    review_stats = result.get("review_stats") if isinstance(result.get("review_stats"), list) else []
+    review_error = str(result.get("review_error", "") or "")
+    updated_scan_run = scan_run_service.update_scan_run_review(
+        scan_run.get("id"),
+        review_after_scan=True,
+        review_snapshot_count=int(review_result.get("count") or 0),
+        review_stats_count=len(review_stats),
+        review_error=review_error,
+    )
+    if updated_scan_run is not None:
+        result["scan_run"] = updated_scan_run
+    elif isinstance(scan_run, dict):
+        scan_run.update(
+            {
+                "review_after_scan": True,
+                "review_snapshot_count": int(review_result.get("count") or 0),
+                "review_stats_count": len(review_stats),
+                "review_error": review_error,
+            }
+        )
     return result
 
 

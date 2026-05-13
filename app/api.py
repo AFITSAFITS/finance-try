@@ -452,6 +452,28 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
                 )
             except Exception as exc:  # noqa: BLE001
                 review_error = str(exc)
+            review_snapshot_count = int((review_result or {}).get("count") or 0)
+            review_stats_count = len(review_stats)
+            scan_run = result.get("scan_run") if isinstance(result.get("scan_run"), dict) else {}
+            result["scan_run"] = scan_run
+            updated_scan_run = scan_run_service.update_scan_run_review(
+                scan_run.get("id"),
+                review_after_scan=True,
+                review_snapshot_count=review_snapshot_count,
+                review_stats_count=review_stats_count,
+                review_error=review_error,
+            )
+            if updated_scan_run is not None:
+                result["scan_run"] = updated_scan_run
+            elif isinstance(scan_run, dict):
+                scan_run.update(
+                    {
+                        "review_after_scan": True,
+                        "review_snapshot_count": review_snapshot_count,
+                        "review_stats_count": review_stats_count,
+                        "review_error": review_error,
+                    }
+                )
         return {
             "as_of": tdx_service.now_ts(),
             "count": len(result["persisted_events"]),

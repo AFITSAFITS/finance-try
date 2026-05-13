@@ -88,3 +88,7 @@ def test_run_single_scan_job_can_review_after_scan(monkeypatch) -> None:
     assert review_called["stats"]["horizon"] == "T+3"
     assert result["review_result"]["count"] == 3
     assert len(result["review_stats"]) == 1
+    assert result["scan_run"]["review_after_scan"] is True
+    assert result["scan_run"]["review_snapshot_count"] == 3
+    assert result["scan_run"]["review_stats_count"] == 1
+    assert result["scan_run"]["review_error"] == ""

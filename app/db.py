@@ -177,6 +177,10 @@ CREATE TABLE IF NOT EXISTS scan_runs (
     min_score REAL,
     status TEXT NOT NULL DEFAULT '',
     note TEXT NOT NULL DEFAULT '',
+    review_after_scan INTEGER NOT NULL DEFAULT 0,
+    review_snapshot_count INTEGER NOT NULL DEFAULT 0,
+    review_stats_count INTEGER NOT NULL DEFAULT 0,
+    review_error TEXT NOT NULL DEFAULT '',
     summary_json TEXT NOT NULL
 );
 
@@ -188,6 +192,10 @@ MIGRATIONS_SQL = [
     "ALTER TABLE limit_up_candidates ADD COLUMN sector_heat_rank INTEGER",
     "ALTER TABLE scan_runs ADD COLUMN status TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE scan_runs ADD COLUMN note TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE scan_runs ADD COLUMN review_after_scan INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE scan_runs ADD COLUMN review_snapshot_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE scan_runs ADD COLUMN review_stats_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE scan_runs ADD COLUMN review_error TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE review_snapshots ADD COLUMN stop_hit INTEGER",
     "ALTER TABLE review_snapshots ADD COLUMN target_hit INTEGER",
     "ALTER TABLE review_snapshots ADD COLUMN risk_plan_outcome TEXT NOT NULL DEFAULT ''",

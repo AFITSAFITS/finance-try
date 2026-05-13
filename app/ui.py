@@ -918,6 +918,12 @@ def main() -> None:
                     f"状态={data['scan_run'].get('status', '')} | "
                     f"{data['scan_run'].get('note', '')}"
                 )
+                if data["scan_run"].get("review_after_scan"):
+                    st.caption(
+                        f"运行记录复盘：快照 {data['scan_run'].get('review_snapshot_count', 0)} 条 | "
+                        f"统计 {data['scan_run'].get('review_stats_count', 0)} 组 | "
+                        f"错误 {data['scan_run'].get('review_error', '') or '无'}"
+                    )
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("扫描股票数", data.get("requested_count", 0))
             m2.metric("新增事件数", data.get("count", 0))

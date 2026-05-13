@@ -13,6 +13,7 @@ if str(ROOT_DIR) not in sys.path:
 from app import notification_service
 from app.api import select_newly_delivered_events
 from app import review_service
+from app import scan_run_service
 from app import scan_workflow
 
 
@@ -139,9 +140,34 @@ def main() -> int:
             )
         except Exception as exc:  # noqa: BLE001
             print(f"ERROR [review]: {exc}", file=sys.stderr)
+            scan_run = result.get("scan_run") if isinstance(result.get("scan_run"), dict) else {}
+            updated_scan_run = scan_run_service.update_scan_run_review(
+                scan_run.get("id"),
+                review_after_scan=True,
+                review_error=str(exc),
+            )
+            if updated_scan_run is not None:
+                result["scan_run"] = updated_scan_run
             return 1
 
+        scan_run = result.get("scan_run") if isinstance(result.get("scan_run"), dict) else {}
+        updated_scan_run = scan_run_service.update_scan_run_review(
+            scan_run.get("id"),
+            review_after_scan=True,
+            review_snapshot_count=int(review_result.get("count") or 0),
+            review_stats_count=len(review_stats),
+            review_error="",
+        )
+        if updated_scan_run is not None:
+            result["scan_run"] = updated_scan_run
         print(f"review_snapshots={review_result['count']}")
+        print(
+            "scan_run_review "
+            f"enabled={result['scan_run'].get('review_after_scan', True)} "
+            f"snapshots={result['scan_run'].get('review_snapshot_count', review_result['count'])} "
+            f"stats={result['scan_run'].get('review_stats_count', len(review_stats))} "
+            f"error={result['scan_run'].get('review_error', '')}"
+        )
         for error in review_result["errors"]:
             print(f"WARNING [review {error.get('股票代码', '')}]: {error.get('error', '')}", file=sys.stderr)
         if review_stats:

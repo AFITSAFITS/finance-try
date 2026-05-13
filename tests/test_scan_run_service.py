@@ -23,6 +23,10 @@ def test_persist_and_list_scan_runs(monkeypatch, tmp_path) -> None:
     assert saved["id"] == 1
     assert saved["status"] == "正常"
     assert saved["note"] == "扫描完成并生成信号"
+    assert saved["review_after_scan"] is False
+    assert saved["review_snapshot_count"] == 0
+    assert saved["review_stats_count"] == 0
+    assert saved["review_error"] == ""
     assert saved["summary"]["signals"] == 1
     assert len(items) == 1
     assert items[0]["event_count"] == 1
@@ -87,3 +91,35 @@ def test_list_scan_runs_backfills_blank_legacy_status(monkeypatch, tmp_path) -> 
 
     assert items[0]["status"] == "正常"
     assert items[0]["note"] == "扫描完成并生成信号"
+
+
+def test_update_scan_run_review(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+    saved = scan_run_service.persist_scan_run(
+        channel="stdout",
+        watchlist={"name": "默认股票池"},
+        watchlist_source="existing",
+        requested_count=1,
+        event_count=0,
+        notification_count=0,
+        error_count=0,
+        elapsed_seconds=1.23,
+        min_score=60,
+        signal_summary={"signals": 0, "stale_signals": 0},
+    )
+
+    updated = scan_run_service.update_scan_run_review(
+        saved["id"],
+        review_after_scan=True,
+        review_snapshot_count=3,
+        review_stats_count=2,
+        review_error="",
+    )
+    items = scan_run_service.list_scan_runs()
+
+    assert updated is not None
+    assert updated["review_after_scan"] is True
+    assert updated["review_snapshot_count"] == 3
+    assert updated["review_stats_count"] == 2
+    assert updated["review_error"] == ""
+    assert items[0]["review_after_scan"] is True

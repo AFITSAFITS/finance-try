@@ -115,6 +115,17 @@ def test_run_daily_scan_cli_can_review_after_scan(monkeypatch, capsys) -> None:
     monkeypatch.setattr(module.review_service, "backfill_review_snapshots", fake_backfill_review_snapshots)
     monkeypatch.setattr(module.review_service, "summarize_review_stats", fake_summarize_review_stats)
     monkeypatch.setattr(
+        module.scan_run_service,
+        "update_scan_run_review",
+        lambda scan_run_id, **kwargs: {
+            "id": scan_run_id,
+            "review_after_scan": kwargs["review_after_scan"],
+            "review_snapshot_count": kwargs["review_snapshot_count"],
+            "review_stats_count": kwargs["review_stats_count"],
+            "review_error": kwargs["review_error"],
+        },
+    )
+    monkeypatch.setattr(
         sys,
         "argv",
         [
@@ -138,6 +149,7 @@ def test_run_daily_scan_cli_can_review_after_scan(monkeypatch, capsys) -> None:
     assert review_called["backfill"]["horizons"] == [1, 3]
     assert review_called["stats"]["horizon"] == "T+3"
     assert "review_snapshots=2" in captured.out
+    assert "scan_run_review enabled=True snapshots=2 stats=1 error=" in captured.out
     assert "review_summary" in captured.out
     assert "confidence=中" in captured.out
     assert "actionable=True" in captured.out
