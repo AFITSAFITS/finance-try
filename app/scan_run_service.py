@@ -77,6 +77,7 @@ def persist_scan_run(
     elapsed_seconds: float | None,
     min_score: float | None,
     signal_summary: dict[str, Any],
+    strategy_guard: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     run_at = tdx_service.now_ts()
     health = build_scan_run_health(
@@ -85,7 +86,10 @@ def persist_scan_run(
         error_count=error_count,
         signal_summary=signal_summary,
     )
-    summary_json = json.dumps(signal_summary, ensure_ascii=False, sort_keys=True)
+    summary_payload = dict(signal_summary)
+    if strategy_guard:
+        summary_payload["strategy_guard"] = dict(strategy_guard)
+    summary_json = json.dumps(summary_payload, ensure_ascii=False, sort_keys=True)
     with db.get_connection() as conn:
         cursor = conn.execute(
             """

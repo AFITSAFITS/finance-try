@@ -17,6 +17,7 @@ def test_persist_and_list_scan_runs(monkeypatch, tmp_path) -> None:
         elapsed_seconds=1.23,
         min_score=50,
         signal_summary={"signals": 1, "observation_counts": {"谨慎观察": 1}},
+        strategy_guard={"horizon": "T+1", "matched_count": 1, "total_count": 1, "mute_downgraded": True, "muted_count": 0},
     )
     items = scan_run_service.list_scan_runs()
 
@@ -28,9 +29,11 @@ def test_persist_and_list_scan_runs(monkeypatch, tmp_path) -> None:
     assert saved["review_stats_count"] == 0
     assert saved["review_error"] == ""
     assert saved["summary"]["signals"] == 1
+    assert saved["summary"]["strategy_guard"]["matched_count"] == 1
     assert len(items) == 1
     assert items[0]["event_count"] == 1
     assert items[0]["summary"]["observation_counts"] == {"谨慎观察": 1}
+    assert items[0]["summary"]["strategy_guard"]["mute_downgraded"] is True
 
 
 def test_build_scan_run_health_statuses() -> None:

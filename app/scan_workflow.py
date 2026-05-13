@@ -138,6 +138,7 @@ def run_default_watchlist_scan(
         elapsed_seconds=round(time.perf_counter() - started_at, 3),
         min_score=min_score,
         signal_summary=signal_summary,
+        strategy_guard=strategy_guard,
     )
     return {
         "watchlist": watchlist,

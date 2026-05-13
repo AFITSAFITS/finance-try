@@ -1058,6 +1058,14 @@ def main() -> None:
             m3.metric("错误数", data.get("error_count", len(data.get("errors", []))))
             m4.metric("耗时(秒)", data.get("elapsed_seconds", ""))
             st.caption(f"本次代表通知数={data.get('notification_count', len(data.get('deliveries', [])))}")
+            strategy_guard = data.get("strategy_guard") if isinstance(data.get("strategy_guard"), dict) else {}
+            if strategy_guard:
+                st.caption(
+                    f"策略结论匹配：周期={strategy_guard.get('horizon', '')} | "
+                    f"已匹配={strategy_guard.get('matched_count', 0)}/{strategy_guard.get('total_count', 0)} | "
+                    f"降权静音={strategy_guard.get('mute_downgraded', False)} | "
+                    f"静音={strategy_guard.get('muted_count', 0)}"
+                )
             if data.get("review_after_scan"):
                 review_result = data.get("review_result") or {}
                 review_stats = data.get("review_stats") or []
@@ -1095,6 +1103,17 @@ def main() -> None:
             if runs.empty:
                 st.warning("还没有扫描运行记录。")
             else:
+                if "summary" in runs.columns:
+                    runs["策略匹配"] = runs["summary"].map(
+                        lambda item: (item or {}).get("strategy_guard", {}).get("matched_count", "")
+                        if isinstance(item, dict)
+                        else ""
+                    )
+                    runs["降权静音数"] = runs["summary"].map(
+                        lambda item: (item or {}).get("strategy_guard", {}).get("muted_count", "")
+                        if isinstance(item, dict)
+                        else ""
+                    )
                 show_downloadable_table(runs, "scan_runs.csv")
 
         if c1.button("刷新当日事件"):

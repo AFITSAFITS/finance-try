@@ -150,6 +150,7 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch, tmp_
     assert result["scan_run"]["event_count"] == 2
     assert result["scan_run"]["status"] == "正常"
     assert result["scan_run"]["summary"]["signals"] == 1
+    assert result["scan_run"]["summary"]["strategy_guard"]["matched_count"] == 2
     assert [item["id"] for item in result["notification_events"]] == [2]
     assert delivered["ids"] == [2]
     assert delivered["strategy_verdicts"] == ["保留"]
@@ -194,6 +195,7 @@ def test_run_default_watchlist_scan_can_mute_downgraded_notifications(monkeypatc
 
     assert result["scan_run"]["event_count"] == 2
     assert result["scan_run"]["notification_count"] == 1
+    assert result["scan_run"]["summary"]["strategy_guard"]["muted_count"] == 1
     assert result["strategy_guard"]["mute_downgraded"] is True
     assert result["strategy_guard"]["muted_count"] == 1
     assert [item["id"] for item in result["notification_events"]] == [2]
