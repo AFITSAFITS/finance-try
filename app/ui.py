@@ -1328,6 +1328,14 @@ def main() -> None:
                         "strategy_next_action",
                     ]
                     st.dataframe(gap_df[[c for c in gap_cols if c in gap_df.columns]], use_container_width=True)
+            review_backlog = data.get("review_backlog") or {}
+            if review_backlog:
+                st.caption(
+                    f"复盘缺口：总样本={review_backlog.get('total_count', 0)} | "
+                    f"已复盘={review_backlog.get('reviewed_count', 0)} | "
+                    f"未复盘={review_backlog.get('missing_count', 0)} | "
+                    f"覆盖率={review_backlog.get('reviewed_ratio')}"
+                )
             strategy_df = pd.DataFrame(data.get("items", []))
             if strategy_df.empty:
                 st.warning("当前还没有可展示的策略结论。请先回填复盘结果。")

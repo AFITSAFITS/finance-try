@@ -207,6 +207,14 @@ def main() -> int:
                 f"samples_to_actionable={gap_item['samples_to_actionable']} | "
                 f"next_action={gap_item['strategy_next_action']}"
             )
+        review_backlog = strategy_summary.get("review_backlog") or {}
+        if review_backlog:
+            print(
+                f"review_backlog total={review_backlog.get('total_count', 0)} | "
+                f"reviewed={review_backlog.get('reviewed_count', 0)} | "
+                f"missing={review_backlog.get('missing_count', 0)} | "
+                f"reviewed_ratio={review_backlog.get('reviewed_ratio')}"
+            )
         items = strategy_summary.get("items", [])
         if not items:
             print("没有可用的统一策略结论。")

@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from app import db
 from app import strategy_summary_service
 
 
 def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> None:
+    monkeypatch.setattr(
+        strategy_summary_service,
+        "summarize_review_backlog",
+        lambda **kwargs: {"horizon": kwargs["horizon"], "total_count": 0, "reviewed_count": 0, "missing_count": 0},
+    )
     monkeypatch.setattr(
         strategy_summary_service.review_service,
         "summarize_review_stats",
@@ -81,6 +87,7 @@ def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> N
     assert result["sample_gap_summary"]["needs_more_samples_count"] == 1
     assert result["sample_gap_summary"]["total_samples_to_actionable"] == 3
     assert result["sample_gap_summary"]["nearest_to_actionable"][0]["strategy_name"] == "40-60 / 偏空 / 风险回避 / MACD死叉"
+    assert result["review_backlog"]["missing_count"] == 0
     assert [item["strategy_verdict"] for item in result["items"]] == ["保留", "降权", "样本不足"]
     assert result["items"][0]["strategy_type"] == "日线信号"
     assert result["items"][0]["strategy_name"] == "60-80 / 偏多 / 谨慎观察 / MACD金叉"
@@ -91,6 +98,11 @@ def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> N
 
 
 def test_summarize_strategy_decisions_applies_limit(monkeypatch) -> None:
+    monkeypatch.setattr(
+        strategy_summary_service,
+        "summarize_review_backlog",
+        lambda **kwargs: {"horizon": kwargs["horizon"], "total_count": 0, "reviewed_count": 0, "missing_count": 0},
+    )
     monkeypatch.setattr(
         strategy_summary_service.review_service,
         "summarize_review_stats",
@@ -131,6 +143,11 @@ def test_summarize_strategy_decisions_applies_limit(monkeypatch) -> None:
 
 
 def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch) -> None:
+    monkeypatch.setattr(
+        strategy_summary_service,
+        "summarize_review_backlog",
+        lambda **kwargs: {"horizon": kwargs["horizon"], "total_count": 0, "reviewed_count": 0, "missing_count": 0},
+    )
     monkeypatch.setattr(
         strategy_summary_service.review_service,
         "summarize_review_stats",
@@ -183,3 +200,55 @@ def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch
     assert result["sample_gap_summary"]["needs_more_samples_count"] == 0
     assert result["sample_gap_summary"]["nearest_to_actionable"] == []
     assert [item["strategy_name"] for item in result["items"]] == ["60-80 / 偏多 / 正常观察 / 信号A"]
+
+
+def test_summarize_review_backlog_counts_missing_snapshots(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+    with db.get_connection() as conn:
+        first_signal = conn.execute(
+            """
+            INSERT INTO signal_events (
+                trade_date, code, indicator, event_type, severity, summary,
+                close_price, pct_change, payload_json, created_at
+            )
+            VALUES ('2026-05-01', '300001', 'MACD', 'golden_cross', 'normal', '信号A', 10, 1.2, '{}', 'now')
+            """
+        ).lastrowid
+        conn.execute(
+            """
+            INSERT INTO signal_events (
+                trade_date, code, indicator, event_type, severity, summary,
+                close_price, pct_change, payload_json, created_at
+            )
+            VALUES ('2026-05-02', '300002', 'MACD', 'golden_cross', 'normal', '信号B', 11, 0.8, '{}', 'now')
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO review_snapshots (
+                signal_event_id, horizon, future_trade_date, future_close_price,
+                pct_return, max_drawdown, updated_at
+            )
+            VALUES (?, 'T+3', '2026-05-06', 10.5, 5, -1, 'now')
+            """,
+            (first_signal,),
+        )
+        conn.execute(
+            """
+            INSERT INTO limit_up_candidates (
+                trade_date, code, name, sector, close_price, pct_change,
+                turnover_rate, consecutive_boards, score, reason, payload_json, created_at
+            )
+            VALUES ('2026-05-01', '300003', '样本C', '测试', 12, 10, 3, 1, 55, '测试', '{}', 'now')
+            """
+        )
+
+    result = strategy_summary_service.summarize_review_backlog(horizon="T+3")
+
+    assert result["total_count"] == 3
+    assert result["reviewed_count"] == 1
+    assert result["missing_count"] == 2
+    assert result["reviewed_ratio"] == 0.3333
+    assert result["signals"]["missing_count"] == 1
+    assert result["limit_up"]["missing_count"] == 1
+    assert result["signals"]["latest_missing"][0]["code"] == "300002"

@@ -146,6 +146,7 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
                     }
                 ],
             },
+            "review_backlog": {"total_count": 3, "reviewed_count": 1, "missing_count": 2, "reviewed_ratio": 0.3333},
             "items": [
                 {
                     "strategy_type": "日线信号",
@@ -200,6 +201,8 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     assert "'needs_more_samples_count': 1" in captured.out
     assert "sample_gap type=日线信号" in captured.out
     assert "samples_to_actionable=2" in captured.out
+    assert "review_backlog total=3" in captured.out
+    assert "missing=2" in captured.out
     assert "type=日线信号" in captured.out
     assert "next_action=保留该分组" in captured.out
     assert "verdict=保留" in captured.out
@@ -228,6 +231,7 @@ def test_review_cli_prints_strategy_summary_json(monkeypatch, capsys) -> None:
             "data_source_counts": {"本地缓存": 1},
             "next_action_counts": {"保留该分组": 1},
             "sample_gap_summary": {"needs_more_samples_count": 0, "total_samples_to_actionable": 0, "nearest_to_actionable": []},
+            "review_backlog": {"total_count": 1, "reviewed_count": 1, "missing_count": 0, "reviewed_ratio": 1.0},
             "items": [{"strategy_type": "日线信号", "strategy_next_action": "保留该分组"}],
         },
     )
@@ -269,6 +273,7 @@ def test_review_cli_require_actionable_returns_2_when_empty(monkeypatch, capsys)
             "data_source_counts": {},
             "next_action_counts": {},
             "sample_gap_summary": {"needs_more_samples_count": 0, "total_samples_to_actionable": 0, "nearest_to_actionable": []},
+            "review_backlog": {"total_count": 0, "reviewed_count": 0, "missing_count": 0, "reviewed_ratio": None},
             "items": [],
         },
     )
