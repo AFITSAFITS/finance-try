@@ -49,6 +49,7 @@ SIGNAL_OUTPUT_COLUMNS = [
     "参考目标",
     "风险收益比",
     "风险提示",
+    "观察结论",
     "均线信号",
     "信号",
 ]
@@ -274,6 +275,34 @@ def apply_trade_plan_risk(row: dict[str, object]) -> None:
     row["信号评分"] = round(score, 2)
     row["信号级别"] = _signal_level(score)
     row["风险提示"] = "；".join(dict.fromkeys(risks)) if risks else "无明显风险"
+
+
+def apply_observation_conclusion(row: dict[str, object]) -> None:
+    direction = str(row.get("信号方向") or "")
+    risk_note = str(row.get("风险提示") or "")
+    risk_parts = [part for part in risk_note.split("；") if part and part != "无明显风险"]
+    try:
+        score = float(row.get("信号评分", 0) or 0)
+    except (TypeError, ValueError):
+        score = 0.0
+    try:
+        close = float(row.get("收盘"))
+        stop_price = float(row.get("参考止损"))
+        stop_distance_pct = (close - stop_price) / close * 100 if close > 0 and 0 < stop_price < close else None
+    except (TypeError, ValueError):
+        stop_distance_pct = None
+
+    if direction == "偏空":
+        conclusion = "风险回避"
+    elif score < 60:
+        conclusion = "暂不参考"
+    elif score >= 80 and not risk_parts:
+        conclusion = "重点观察"
+    elif risk_parts or (stop_distance_pct is not None and stop_distance_pct > 8):
+        conclusion = "谨慎观察"
+    else:
+        conclusion = "正常观察"
+    row["观察结论"] = conclusion
 
 
 def score_signal_row(row: dict[str, object]) -> dict[str, object]:
@@ -520,6 +549,7 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
     row.update(score_signal_row(row))
     row.update(extract_bullish_trade_plan(enriched, row))
     apply_trade_plan_risk(row)
+    apply_observation_conclusion(row)
     return row
 
 

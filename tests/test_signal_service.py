@@ -173,6 +173,32 @@ def test_trade_plan_risk_lowers_score_when_stop_is_too_far() -> None:
     assert "止损距离偏大" in row["风险提示"]
 
 
+def test_apply_observation_conclusion_uses_score_risk_and_direction() -> None:
+    key_row = {
+        "信号方向": "偏多",
+        "信号评分": 85,
+        "风险提示": "无明显风险",
+        "收盘": 10.0,
+        "参考止损": 9.5,
+    }
+    caution_row = {
+        "信号方向": "偏多",
+        "信号评分": 75,
+        "风险提示": "止损距离偏大",
+        "收盘": 10.0,
+        "参考止损": 9.0,
+    }
+    bearish_row = {"信号方向": "偏空", "信号评分": 20, "风险提示": "跌幅偏大"}
+
+    signal_service.apply_observation_conclusion(key_row)
+    signal_service.apply_observation_conclusion(caution_row)
+    signal_service.apply_observation_conclusion(bearish_row)
+
+    assert key_row["观察结论"] == "重点观察"
+    assert caution_row["观察结论"] == "谨慎观察"
+    assert bearish_row["观察结论"] == "风险回避"
+
+
 def test_scan_stock_signal_events_collects_fetch_errors() -> None:
     def fake_fetcher(code: str, lookback_days: int = 180, adjust: str = "qfq") -> pd.DataFrame:
         if code == "600002":
@@ -365,6 +391,7 @@ def test_scan_stock_signal_events_outputs_trade_plan() -> None:
     assert row["参考止损"] < row["收盘"]
     assert row["参考目标"] > row["收盘"]
     assert row["风险收益比"] == 2.0
+    assert row["观察结论"] in {"正常观察", "谨慎观察", "重点观察"}
 
 
 class _FakeResponse:
