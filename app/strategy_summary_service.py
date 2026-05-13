@@ -55,6 +55,7 @@ def _normalize_signal_item(item: dict[str, Any]) -> dict[str, Any]:
             "samples_to_actionable",
             max(0, review_decision.MIN_ACTIONABLE_SAMPLES - int(item.get("sample_count", 0) or 0)),
         ),
+        "strategy_next_action": item.get("strategy_next_action", ""),
         "strategy_note": item.get("strategy_note", ""),
     }
 
@@ -77,6 +78,7 @@ def _normalize_limit_up_item(item: dict[str, Any]) -> dict[str, Any]:
             "samples_to_actionable",
             max(0, review_decision.MIN_ACTIONABLE_SAMPLES - int(item.get("sample_count", 0) or 0)),
         ),
+        "strategy_next_action": item.get("strategy_next_action", ""),
         "strategy_note": item.get("strategy_note", ""),
     }
 

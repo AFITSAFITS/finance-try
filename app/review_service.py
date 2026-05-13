@@ -475,6 +475,7 @@ def summarize_review_stats(
                 else None,
                 "strategy_verdict": decision["strategy_verdict"],
                 "strategy_note": decision["strategy_note"],
+                "strategy_next_action": decision["strategy_next_action"],
                 "strategy_confidence": decision["strategy_confidence"],
                 "strategy_actionable": decision["strategy_actionable"],
                 "min_actionable_samples": decision["min_actionable_samples"],

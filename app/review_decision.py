@@ -40,6 +40,7 @@ def build_review_decision(
         return {
             "strategy_verdict": "样本不足",
             "strategy_note": f"样本数少于{MIN_ACTIONABLE_SAMPLES}，先继续积累",
+            "strategy_next_action": f"继续积累样本，还差{confidence['samples_to_actionable']}个样本再判断",
             **confidence,
         }
 
@@ -47,6 +48,7 @@ def build_review_decision(
         return {
             "strategy_verdict": "保留",
             "strategy_note": "收益、胜率和回撤都处于可接受区间",
+            "strategy_next_action": "保留该分组，继续跟踪表现",
             **confidence,
         }
 
@@ -54,11 +56,13 @@ def build_review_decision(
         return {
             "strategy_verdict": "降权",
             "strategy_note": "收益、胜率或回撤有明显拖累",
+            "strategy_next_action": "降低权重或暂停自动提醒",
             **confidence,
         }
 
     return {
         "strategy_verdict": "继续观察",
         "strategy_note": "表现尚未稳定，需要更多样本确认",
+        "strategy_next_action": "继续观察，暂不调整规则",
         **confidence,
     }

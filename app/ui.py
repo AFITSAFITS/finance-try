@@ -864,6 +864,7 @@ def main() -> None:
                     "strategy_confidence",
                     "strategy_actionable",
                     "samples_to_actionable",
+                    "strategy_next_action",
                     "strategy_note",
                     "horizon",
                 ]
@@ -1245,6 +1246,7 @@ def main() -> None:
                     "strategy_confidence",
                     "strategy_actionable",
                     "samples_to_actionable",
+                    "strategy_next_action",
                     "strategy_note",
                     "horizon",
                 ]
@@ -1318,6 +1320,7 @@ def main() -> None:
                     "strategy_confidence",
                     "strategy_actionable",
                     "samples_to_actionable",
+                    "strategy_next_action",
                     "sample_count",
                     "avg_return",
                     "win_rate",

@@ -181,7 +181,8 @@ def main() -> int:
                     f"win_rate={item['win_rate']} "
                     f"verdict={item['strategy_verdict']} "
                     f"confidence={item['strategy_confidence']} "
-                    f"actionable={item['strategy_actionable']}"
+                    f"actionable={item['strategy_actionable']} "
+                    f"next_action={item.get('strategy_next_action', '')}"
                 )
         else:
             print("没有可用的复盘统计结果。")

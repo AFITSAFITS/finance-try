@@ -141,6 +141,7 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
                     "strategy_verdict": "保留",
                     "strategy_confidence": "中",
                     "strategy_actionable": True,
+                    "strategy_next_action": "保留该分组",
                     "strategy_note": "表现可接受",
                 }
             ],
@@ -177,4 +178,5 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     assert "types={'日线信号': 1}" in captured.out
     assert "sources={'本地缓存': 1}" in captured.out
     assert "type=日线信号" in captured.out
+    assert "next_action=保留该分组" in captured.out
     assert "verdict=保留" in captured.out

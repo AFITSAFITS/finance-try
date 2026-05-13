@@ -22,6 +22,7 @@ def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> N
                 "strategy_confidence": "中",
                 "strategy_actionable": True,
                 "strategy_note": "表现可接受",
+                "strategy_next_action": "保留该分组",
                 "horizon": kwargs["horizon"],
             },
             {
@@ -38,6 +39,7 @@ def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> N
                 "strategy_confidence": "低",
                 "strategy_actionable": False,
                 "strategy_note": "继续积累",
+                "strategy_next_action": "继续积累样本",
                 "horizon": kwargs["horizon"],
             },
         ],
@@ -57,6 +59,7 @@ def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> N
                 "strategy_confidence": "中",
                 "strategy_actionable": True,
                 "strategy_note": "回撤偏大",
+                "strategy_next_action": "降低权重",
                 "horizon": kwargs["horizon"],
             }
         ],
@@ -76,6 +79,7 @@ def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> N
     assert [item["strategy_verdict"] for item in result["items"]] == ["保留", "降权", "样本不足"]
     assert result["items"][0]["strategy_type"] == "日线信号"
     assert result["items"][0]["strategy_name"] == "60-80 / 偏多 / 谨慎观察 / MACD金叉"
+    assert result["items"][0]["strategy_next_action"] == "保留该分组"
     assert result["items"][0]["samples_to_actionable"] == 0
     assert result["items"][1]["strategy_type"] == "涨停策略"
     assert result["items"][2]["samples_to_actionable"] == 3

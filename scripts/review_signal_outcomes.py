@@ -129,6 +129,7 @@ def main() -> int:
                 f"verdict={item['strategy_verdict']} | "
                 f"confidence={item['strategy_confidence']} | actionable={item['strategy_actionable']} | "
                 f"samples_to_actionable={item.get('samples_to_actionable', '')} | "
+                f"next_action={item.get('strategy_next_action', '')} | "
                 f"note={item['strategy_note']}"
             )
     elif args.target in {"signals", "both"}:
@@ -148,6 +149,7 @@ def main() -> int:
                 f"avg_sector_limit_up_count={item['avg_sector_limit_up_count']} | "
                 f"verdict={item['strategy_verdict']} | confidence={item['strategy_confidence']} | "
                 f"actionable={item['strategy_actionable']} | samples_to_actionable={item.get('samples_to_actionable', '')} | "
+                f"next_action={item.get('strategy_next_action', '')} | "
                 f"note={item['strategy_note']}"
             )
     elif args.target in {"limit-up", "both"}:
@@ -174,6 +176,7 @@ def main() -> int:
                 f"avg_max_drawdown={item['avg_max_drawdown']} | verdict={item['strategy_verdict']} | "
                 f"confidence={item['strategy_confidence']} | actionable={item['strategy_actionable']} | "
                 f"samples_to_actionable={item.get('samples_to_actionable', '')} | "
+                f"next_action={item.get('strategy_next_action', '')} | "
                 f"note={item['strategy_note']}"
             )
     return 0
