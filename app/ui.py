@@ -1258,11 +1258,16 @@ def main() -> None:
         strategy_date = c2.text_input("交易日过滤（可选）", value="", key="strategy_date")
         strategy_code = c3.text_input("股票代码过滤（可选）", value="", key="strategy_code")
         strategy_limit = int(c4.number_input("最多展示", min_value=1, max_value=200, value=50, step=10, key="strategy_limit"))
+        c1, c2 = st.columns(2)
+        strategy_min_samples = int(c1.number_input("最低样本数", min_value=1, max_value=10000, value=1, step=1, key="strategy_min_samples"))
+        strategy_actionable_only = c2.checkbox("只看可行动结论", value=False, key="strategy_actionable_only")
 
         if st.button("加载策略结论", type="primary"):
             params = {
                 "horizon": strategy_horizon,
                 "limit": strategy_limit,
+                "min_samples": strategy_min_samples,
+                "actionable_only": strategy_actionable_only,
             }
             if strategy_date.strip():
                 params["trade_date"] = strategy_date.strip()
@@ -1283,6 +1288,7 @@ def main() -> None:
                 {
                     "时间": data.get("as_of", ""),
                     "总分组": data.get("total_count", 0),
+                    "过滤后": data.get("filtered_count", 0),
                     "可执行": data.get("actionable_count", 0),
                     "展示": data.get("count", 0),
                 }

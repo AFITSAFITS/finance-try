@@ -227,11 +227,12 @@ python scripts/review_signal_outcomes.py --trade-date 2026-04-08 --summary-horiz
 python scripts/review_signal_outcomes.py --target limit-up --trade-date 2026-05-12 --summary-horizon T+3
 python scripts/review_signal_outcomes.py --stats-only --summary-horizon T+3
 python scripts/review_signal_outcomes.py --stats-only --strategy-summary --strategy-limit 20
+python scripts/review_signal_outcomes.py --stats-only --strategy-summary --strategy-actionable-only --strategy-min-samples 5
 ```
 
 `--stats-only` 只读取已经保存的复盘结果，不会重新请求外部行情源，适合日常快速查看统计。正常回填复盘时会优先复用本地 K 线缓存，缓存不足时再请求外部行情源。
 日线复盘统计会同时按评分区间、信号方向、观察结论、数据时效、数据来源、风险提示和止损距离分层，并展示平均 60 日位置、平均量能比、平均止损距离、平均风险收益比、止损触发率、目标触发率、止损先到率、目标先到率、策略结论和结论可信度，便于判断哪些信号应该继续保留、观察或降权。
-页面里的 `策略结论` 会把日线信号和涨停策略的复盘统计合在一起，优先展示可执行的保留、降权和观察结论；命令行也可以用 `--strategy-summary` 快速查看同一套结论。
+页面里的 `策略结论` 会把日线信号和涨停策略的复盘统计合在一起，优先展示可执行的保留、降权和观察结论；命令行也可以用 `--strategy-summary` 快速查看同一套结论，并用 `--strategy-actionable-only` 和 `--strategy-min-samples` 过滤低样本噪音。
 
 ### 涨停突破候选
 

@@ -598,6 +598,8 @@ def api_strategy_summary(
     trade_date: str | None = None,
     code: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
+    min_samples: int = Query(default=1, ge=1, le=10000),
+    actionable_only: bool = Query(default=False),
 ) -> dict[str, Any]:
     try:
         result = strategy_summary_service.summarize_strategy_decisions(
@@ -605,6 +607,8 @@ def api_strategy_summary(
             trade_date=trade_date.strip() if trade_date else None,
             code=code.strip() if code else None,
             limit=int(limit),
+            min_samples=int(min_samples),
+            actionable_only=bool(actionable_only),
         )
         return {
             "as_of": tdx_service.now_ts(),

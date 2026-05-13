@@ -113,10 +113,15 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
         called["strategy"] = True
         assert kwargs["horizon"] == "T+3"
         assert kwargs["limit"] == 5
+        assert kwargs["min_samples"] == 5
+        assert kwargs["actionable_only"] is True
         return {
             "horizon": "T+3",
             "total_count": 1,
+            "filtered_count": 1,
             "actionable_count": 1,
+            "min_samples": 5,
+            "actionable_only": True,
             "verdict_counts": {"保留": 1},
             "confidence_counts": {"中": 1},
             "items": [
@@ -141,7 +146,16 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         sys,
         "argv",
-        [str(REVIEW_SCRIPT), "--stats-only", "--strategy-summary", "--strategy-limit", "5"],
+        [
+            str(REVIEW_SCRIPT),
+            "--stats-only",
+            "--strategy-summary",
+            "--strategy-limit",
+            "5",
+            "--strategy-min-samples",
+            "5",
+            "--strategy-actionable-only",
+        ],
     )
 
     assert module.main() == 0
@@ -149,6 +163,9 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     assert called == {"strategy": True}
     assert "strategy_summary" in captured.out
     assert "total=1" in captured.out
+    assert "filtered=1" in captured.out
     assert "actionable=1" in captured.out
+    assert "min_samples=5" in captured.out
+    assert "actionable_only=True" in captured.out
     assert "type=日线信号" in captured.out
     assert "verdict=保留" in captured.out

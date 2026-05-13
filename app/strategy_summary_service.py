@@ -94,6 +94,8 @@ def summarize_strategy_decisions(
     trade_date: str | None = None,
     code: str | None = None,
     limit: int = 50,
+    min_samples: int = 1,
+    actionable_only: bool = False,
 ) -> dict[str, Any]:
     signal_items = [
         _normalize_signal_item(item)
@@ -111,14 +113,21 @@ def summarize_strategy_decisions(
             code=code,
         )
     ]
-    items = [*signal_items, *limit_up_items]
+    min_samples = max(1, int(min_samples))
+    all_items = [*signal_items, *limit_up_items]
+    actionable_count = sum(1 for item in all_items if item["strategy_actionable"])
+    items = [item for item in all_items if int(item.get("sample_count", 0) or 0) >= min_samples]
+    if actionable_only:
+        items = [item for item in items if item["strategy_actionable"]]
     items.sort(key=_sort_key)
     limited = items[: max(1, int(limit))]
-    actionable_count = sum(1 for item in items if item["strategy_actionable"])
     return {
         "horizon": horizon,
-        "total_count": len(items),
+        "total_count": len(all_items),
+        "filtered_count": len(items),
         "actionable_count": actionable_count,
+        "min_samples": min_samples,
+        "actionable_only": bool(actionable_only),
         "verdict_counts": _count_by(items, "strategy_verdict"),
         "confidence_counts": _count_by(items, "strategy_confidence"),
         "items": limited,

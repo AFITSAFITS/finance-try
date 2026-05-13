@@ -668,10 +668,15 @@ def test_strategy_summary_api(monkeypatch) -> None:
     def fake_summary(**kwargs):
         assert kwargs["horizon"] == "T+3"
         assert kwargs["limit"] == 20
+        assert kwargs["min_samples"] == 5
+        assert kwargs["actionable_only"] is True
         return {
             "horizon": "T+3",
             "total_count": 1,
+            "filtered_count": 1,
             "actionable_count": 1,
+            "min_samples": 5,
+            "actionable_only": True,
             "verdict_counts": {"保留": 1},
             "confidence_counts": {"中": 1},
             "items": [
@@ -687,11 +692,17 @@ def test_strategy_summary_api(monkeypatch) -> None:
 
     monkeypatch.setattr(api_module.strategy_summary_service, "summarize_strategy_decisions", fake_summary)
 
-    resp = client.get("/api/strategy/summary", params={"horizon": "T+3", "limit": 20})
+    resp = client.get(
+        "/api/strategy/summary",
+        params={"horizon": "T+3", "limit": 20, "min_samples": 5, "actionable_only": True},
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["count"] == 1
+    assert body["filtered_count"] == 1
     assert body["actionable_count"] == 1
+    assert body["min_samples"] == 5
+    assert body["actionable_only"] is True
     assert body["items"][0]["strategy_verdict"] == "保留"
 
 

@@ -39,6 +39,12 @@ def parse_args() -> argparse.Namespace:
         help="Print a unified strategy decision summary across signal and limit-up reviews",
     )
     parser.add_argument("--strategy-limit", type=int, default=20, help="Maximum unified strategy rows to print")
+    parser.add_argument("--strategy-min-samples", type=int, default=1, help="Minimum samples for unified strategy rows")
+    parser.add_argument(
+        "--strategy-actionable-only",
+        action="store_true",
+        help="Only print unified strategy rows that are actionable",
+    )
     return parser.parse_args()
 
 
@@ -91,6 +97,8 @@ def main() -> int:
                 trade_date=args.trade_date.strip() or None,
                 code=args.code.strip() or None,
                 limit=int(args.strategy_limit),
+                min_samples=int(args.strategy_min_samples),
+                actionable_only=bool(args.strategy_actionable_only),
             )
     except Exception as exc:  # noqa: BLE001
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -145,7 +153,8 @@ def main() -> int:
         print("\nstrategy_summary")
         print(
             f"horizon={strategy_summary['horizon']} | total={strategy_summary['total_count']} | "
-            f"actionable={strategy_summary['actionable_count']} | "
+            f"filtered={strategy_summary['filtered_count']} | actionable={strategy_summary['actionable_count']} | "
+            f"min_samples={strategy_summary['min_samples']} | actionable_only={strategy_summary['actionable_only']} | "
             f"verdicts={strategy_summary['verdict_counts']} | confidence={strategy_summary['confidence_counts']}"
         )
         items = strategy_summary.get("items", [])
