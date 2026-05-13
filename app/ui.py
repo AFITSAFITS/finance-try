@@ -651,6 +651,7 @@ def main() -> None:
             if summary:
                 st.caption(
                     f"观察结论={summary.get('observation_counts', {})} | "
+                    f"观察仓位={summary.get('position_size_counts', {})} | "
                     f"数据时效={summary.get('freshness_counts', {})} | "
                     f"最高评分={summary.get('max_score', '-')}"
                 )
@@ -675,6 +676,8 @@ def main() -> None:
                 "信号方向",
                 "信号级别",
                 "观察结论",
+                "观察仓位",
+                "执行提示",
                 "评分原因",
                 "风险提示",
                 "60日位置",
@@ -1080,6 +1083,7 @@ def main() -> None:
             if summary:
                 st.caption(
                     f"观察结论={summary.get('observation_counts', {})} | "
+                    f"观察仓位={summary.get('position_size_counts', {})} | "
                     f"数据时效={summary.get('freshness_counts', {})} | "
                     f"最高评分={summary.get('max_score', '-')}"
                 )

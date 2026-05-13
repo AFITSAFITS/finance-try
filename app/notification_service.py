@@ -24,6 +24,8 @@ def format_event_message(event: dict[str, Any]) -> str:
     payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
     signal_score = _clean_display(payload.get("signal_score"))
     observation_conclusion = _clean_display(payload.get("observation_conclusion"))
+    observation_position_size = _clean_display(payload.get("observation_position_size"))
+    execution_hint = _clean_display(payload.get("execution_hint"))
     data_freshness = _clean_display(payload.get("data_freshness"))
     data_source = _clean_display(payload.get("data_source"))
     risk_note = _clean_display(payload.get("risk_note"))
@@ -41,6 +43,7 @@ def format_event_message(event: dict[str, Any]) -> str:
     return (
         f"[{trade_date}] {code} {summary} | severity={severity} | "
         f"close={close_price} | pct_change={pct_change} | score={signal_score} | conclusion={observation_conclusion} | "
+        f"position_size={observation_position_size} | execution_hint={execution_hint} | "
         f"data_freshness={data_freshness} | data_source={data_source} | "
         f"position_60d={position_60d} | volume_ratio={volume_ratio} | "
         f"relative_strength={relative_strength} | strength_bucket={relative_strength_bucket} | "
@@ -98,6 +101,8 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
     signal_score = _format_number(payload.get("signal_score"))
     signal_level = _clean_display(payload.get("signal_level"))
     observation_conclusion = _clean_display(payload.get("observation_conclusion"))
+    observation_position_size = _clean_display(payload.get("observation_position_size"))
+    execution_hint = _clean_display(payload.get("execution_hint"))
     data_freshness = _clean_display(payload.get("data_freshness"))
     data_lag_days = _format_number(payload.get("data_lag_days"))
     data_source = _clean_display(payload.get("data_source"))
@@ -147,6 +152,7 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**评分**\n{signal_score}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**级别**\n{signal_level}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**观察结论**\n{observation_conclusion}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**观察仓位**\n{observation_position_size}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**数据时效**\n{data_freshness}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**数据来源**\n{data_source}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**滞后天数**\n{data_lag_days}"}},
@@ -176,7 +182,7 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
                     "tag": "div",
                     "text": {
                         "tag": "lark_md",
-                        "content": f"**下一步动作**\n{strategy_next_action}",
+                        "content": f"**执行提示**\n{execution_hint}\n\n**下一步动作**\n{strategy_next_action}",
                     },
                 },
                 {

@@ -55,6 +55,8 @@ SIGNAL_OUTPUT_COLUMNS = [
     "风险收益比",
     "风险提示",
     "观察结论",
+    "观察仓位",
+    "执行提示",
     "均线信号",
     "信号",
 ]
@@ -329,6 +331,36 @@ def apply_observation_conclusion(row: dict[str, object]) -> None:
     row["观察结论"] = conclusion
 
 
+def apply_execution_hint(row: dict[str, object]) -> None:
+    conclusion = str(row.get("观察结论") or "")
+    direction = str(row.get("信号方向") or "")
+    risk_note = str(row.get("风险提示") or "")
+
+    if "数据明显滞后" in risk_note:
+        row["观察仓位"] = "0%"
+        row["执行提示"] = "先刷新行情，不用旧数据决策"
+        return
+    if direction == "偏空" or conclusion in {"风险回避", "暂不参考"}:
+        row["观察仓位"] = "0%"
+        row["执行提示"] = "不参与，等待新信号"
+        return
+    if conclusion == "重点观察":
+        row["观察仓位"] = "≤30%"
+        row["执行提示"] = "优先观察，跌破参考止损退出"
+        return
+    if conclusion == "正常观察":
+        row["观察仓位"] = "≤20%"
+        row["执行提示"] = "小仓观察，严格按参考止损"
+        return
+    if conclusion == "谨慎观察":
+        row["观察仓位"] = "≤10%"
+        row["执行提示"] = "只做观察仓，等待风险项改善"
+        return
+
+    row["观察仓位"] = "-"
+    row["执行提示"] = "等待更多信号确认"
+
+
 def score_signal_row(row: dict[str, object]) -> dict[str, object]:
     score = 50.0
     reasons: list[str] = []
@@ -550,6 +582,7 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
             "direction_counts": {},
             "data_source_counts": {},
             "relative_strength_bucket_counts": {},
+            "position_size_counts": {},
             "stale_signals": 0,
             "cache_fallback_signals": 0,
         }
@@ -579,6 +612,7 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
         "direction_counts": value_counts("信号方向"),
         "data_source_counts": value_counts("数据来源"),
         "relative_strength_bucket_counts": value_counts("相对强度分层"),
+        "position_size_counts": value_counts("观察仓位"),
         "stale_signals": stale_signals,
         "cache_fallback_signals": int(value_counts("数据来源").get("旧缓存兜底", 0)),
     }
@@ -639,6 +673,7 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
     row.update(extract_bullish_trade_plan(enriched, row))
     apply_trade_plan_risk(row)
     apply_observation_conclusion(row)
+    apply_execution_hint(row)
     return row
 
 

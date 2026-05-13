@@ -125,7 +125,15 @@ def test_summarize_signal_rows_counts_quality_buckets() -> None:
         pd.DataFrame(
             [
                 {"观察结论": "谨慎观察", "数据时效": "最近交易日", "数据来源": "旧缓存兜底", "信号方向": "偏多", "信号评分": 78},
-                {"观察结论": "重点观察", "数据时效": "数据可能滞后", "数据来源": "外部行情源", "信号方向": "偏多", "信号评分": 86, "相对强度分层": "强势"},
+                {
+                    "观察结论": "重点观察",
+                    "观察仓位": "≤30%",
+                    "数据时效": "数据可能滞后",
+                    "数据来源": "外部行情源",
+                    "信号方向": "偏多",
+                    "信号评分": 86,
+                    "相对强度分层": "强势",
+                },
             ]
         ),
         errors=[{"股票代码": "600000", "error": "timeout"}],
@@ -140,6 +148,7 @@ def test_summarize_signal_rows_counts_quality_buckets() -> None:
     assert summary["freshness_counts"] == {"最近交易日": 1, "数据可能滞后": 1}
     assert summary["data_source_counts"] == {"旧缓存兜底": 1, "外部行情源": 1}
     assert summary["relative_strength_bucket_counts"] == {"未标记": 1, "强势": 1}
+    assert summary["position_size_counts"] == {"未标记": 1, "≤30%": 1}
 
 
 def test_extract_candlestick_profile_detects_strong_and_upper_shadow() -> None:
@@ -236,6 +245,26 @@ def test_apply_observation_conclusion_uses_score_risk_and_direction() -> None:
     assert key_row["观察结论"] == "重点观察"
     assert caution_row["观察结论"] == "谨慎观察"
     assert bearish_row["观察结论"] == "风险回避"
+
+
+def test_apply_execution_hint_uses_observation_and_data_quality() -> None:
+    key_row = {"信号方向": "偏多", "观察结论": "重点观察", "风险提示": "无明显风险"}
+    caution_row = {"信号方向": "偏多", "观察结论": "谨慎观察", "风险提示": "止损距离偏大"}
+    stale_row = {"信号方向": "偏多", "观察结论": "正常观察", "风险提示": "数据明显滞后"}
+    bearish_row = {"信号方向": "偏空", "观察结论": "风险回避", "风险提示": "跌幅偏大"}
+
+    signal_service.apply_execution_hint(key_row)
+    signal_service.apply_execution_hint(caution_row)
+    signal_service.apply_execution_hint(stale_row)
+    signal_service.apply_execution_hint(bearish_row)
+
+    assert key_row["观察仓位"] == "≤30%"
+    assert "优先观察" in key_row["执行提示"]
+    assert caution_row["观察仓位"] == "≤10%"
+    assert "风险项改善" in caution_row["执行提示"]
+    assert stale_row["观察仓位"] == "0%"
+    assert "刷新行情" in stale_row["执行提示"]
+    assert bearish_row["观察仓位"] == "0%"
 
 
 def test_scan_stock_signal_events_collects_fetch_errors() -> None:

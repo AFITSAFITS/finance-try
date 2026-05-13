@@ -57,6 +57,8 @@ def test_build_stdout_messages_formats_events() -> None:
                 "payload": {
                     "signal_score": 75,
                     "observation_conclusion": "谨慎观察",
+                    "observation_position_size": "≤10%",
+                    "execution_hint": "只做观察仓，等待风险项改善",
                     "data_freshness": "最近交易日",
                     "data_source": "旧缓存兜底",
                     "position_60d": 0.42,
@@ -80,6 +82,8 @@ def test_build_stdout_messages_formats_events() -> None:
     assert "MACD金叉" in messages[0]
     assert "score=75" in messages[0]
     assert "conclusion=谨慎观察" in messages[0]
+    assert "position_size=≤10%" in messages[0]
+    assert "execution_hint=只做观察仓，等待风险项改善" in messages[0]
     assert "data_freshness=最近交易日" in messages[0]
     assert "data_source=旧缓存兜底" in messages[0]
     assert "position_60d=0.42" in messages[0]
@@ -123,6 +127,8 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
                 "signal_score": 88,
                 "signal_level": "重点观察",
                 "observation_conclusion": "重点观察",
+                "observation_position_size": "≤30%",
+                "execution_hint": "优先观察，跌破参考止损退出",
                 "data_freshness": "当日数据",
                 "data_source": "外部行情源",
                 "data_lag_days": 0,
@@ -152,6 +158,7 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
     assert "**评分**\n88.00" in field_text
     assert "**级别**\n重点观察" in field_text
     assert "**观察结论**\n重点观察" in field_text
+    assert "**观察仓位**\n≤30%" in field_text
     assert "**数据时效**\n当日数据" in field_text
     assert "**数据来源**\n外部行情源" in field_text
     assert "**滞后天数**\n0.00" in field_text
@@ -166,7 +173,7 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
     assert "**结论可信度**\n中" in field_text
     assert "**复盘样本**\n6" in field_text
     assert payload["card"]["elements"][2]["text"]["content"] == "**风险提示**\n无明显风险"
-    assert payload["card"]["elements"][3]["text"]["content"] == "**下一步动作**\n保留该分组，继续跟踪表现"
+    assert payload["card"]["elements"][3]["text"]["content"] == "**执行提示**\n优先观察，跌破参考止损退出\n\n**下一步动作**\n保留该分组，继续跟踪表现"
     assert payload["timestamp"] == "1710000000"
     assert payload["sign"] == "jWsBkWnzlRKtaP+iZgwraSojMWik4cJR7aysApQZuoA="
 

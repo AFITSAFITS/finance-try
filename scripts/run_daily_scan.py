@@ -135,7 +135,8 @@ def main() -> int:
             f"observations={summary.get('observation_counts', {})} "
             f"freshness={summary.get('freshness_counts', {})} "
             f"data_sources={summary.get('data_source_counts', {})} "
-            f"strength={summary.get('relative_strength_bucket_counts', {})}"
+            f"strength={summary.get('relative_strength_bucket_counts', {})} "
+            f"positions={summary.get('position_size_counts', {})}"
         )
     strategy_guard = result.get("strategy_guard") if isinstance(result.get("strategy_guard"), dict) else {}
     if strategy_guard:

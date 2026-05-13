@@ -223,6 +223,7 @@ def print_signal_summary(summary: dict[str, object]) -> None:
         f"freshness={format_counts(summary.get('freshness_counts', {}))} "
         f"data_sources={format_counts(summary.get('data_source_counts', {}))} "
         f"strength={format_counts(summary.get('relative_strength_bucket_counts', {}))} "
+        f"positions={format_counts(summary.get('position_size_counts', {}))} "
         f"directions={format_counts(summary.get('direction_counts', {}))}"
     )
 
@@ -425,6 +426,8 @@ def main() -> int:
                 "信号方向",
                 "信号级别",
                 "观察结论",
+                "观察仓位",
+                "执行提示",
                 "评分原因",
                 "风险提示",
                 "60日位置",
