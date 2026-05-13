@@ -446,6 +446,7 @@ def main() -> None:
         alerts_tab,
         history_tab,
         review_tab,
+        strategy_tab,
         watchlist_tab,
         kline_tab,
     ) = st.tabs(
@@ -458,6 +459,7 @@ def main() -> None:
             "每日任务",
             "历史事件",
             "复盘验证",
+            "策略结论",
             "股票池",
             "K线工具",
         ]
@@ -1248,6 +1250,66 @@ def main() -> None:
                 if cols:
                     stats_df = stats_df[cols]
                 show_downloadable_table(stats_df, "review_stats.csv")
+
+    with strategy_tab:
+        render_section_header("策略结论", "汇总日线信号和涨停策略的复盘结果，优先展示可执行的保留、降权和观察结论。")
+        c1, c2, c3, c4 = st.columns(4)
+        strategy_horizon = c1.selectbox("统计周期", options=["T+1", "T+3", "T+5"], index=1, key="strategy_horizon")
+        strategy_date = c2.text_input("交易日过滤（可选）", value="", key="strategy_date")
+        strategy_code = c3.text_input("股票代码过滤（可选）", value="", key="strategy_code")
+        strategy_limit = int(c4.number_input("最多展示", min_value=1, max_value=200, value=50, step=10, key="strategy_limit"))
+
+        if st.button("加载策略结论", type="primary"):
+            params = {
+                "horizon": strategy_horizon,
+                "limit": strategy_limit,
+            }
+            if strategy_date.strip():
+                params["trade_date"] = strategy_date.strip()
+            if strategy_code.strip():
+                params["code"] = strategy_code.strip()
+            try:
+                data = request_api(
+                    api_base,
+                    "/api/strategy/summary",
+                    method="GET",
+                    params=params,
+                )
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"加载失败: {exc}")
+                st.stop()
+
+            render_result_meta(
+                {
+                    "时间": data.get("as_of", ""),
+                    "总分组": data.get("total_count", 0),
+                    "可执行": data.get("actionable_count", 0),
+                    "展示": data.get("count", 0),
+                }
+            )
+            verdict_counts = data.get("verdict_counts") or {}
+            confidence_counts = data.get("confidence_counts") or {}
+            if verdict_counts or confidence_counts:
+                st.caption(f"结论分布={verdict_counts} | 可信度={confidence_counts}")
+            strategy_df = pd.DataFrame(data.get("items", []))
+            if strategy_df.empty:
+                st.warning("当前还没有可展示的策略结论。请先回填复盘结果。")
+            else:
+                cols = [
+                    "strategy_type",
+                    "strategy_name",
+                    "strategy_verdict",
+                    "strategy_confidence",
+                    "strategy_actionable",
+                    "sample_count",
+                    "avg_return",
+                    "win_rate",
+                    "avg_max_drawdown",
+                    "data_source",
+                    "strategy_note",
+                    "horizon",
+                ]
+                show_downloadable_table(strategy_df[[c for c in cols if c in strategy_df.columns]], "strategy_summary.csv")
 
     with watchlist_tab:
         render_section_header("股票池", "维护默认股票池；每日任务和默认池实时行情都会使用这里保存的列表。")

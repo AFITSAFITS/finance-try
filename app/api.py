@@ -16,6 +16,7 @@ from app import scan_run_service
 from app import scan_workflow
 from app import sector_rotation_service
 from app import signal_service
+from app import strategy_summary_service
 from app import thsdk_service
 from app import tdx_service
 from app import watchlist_service
@@ -586,6 +587,29 @@ def api_review_snapshots(
             "as_of": tdx_service.now_ts(),
             "count": len(items),
             "items": items,
+        }
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc
+
+
+@app.get("/api/strategy/summary")
+def api_strategy_summary(
+    horizon: str = Query(default="T+3"),
+    trade_date: str | None = None,
+    code: str | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+) -> dict[str, Any]:
+    try:
+        result = strategy_summary_service.summarize_strategy_decisions(
+            horizon=horizon.strip() or "T+3",
+            trade_date=trade_date.strip() if trade_date else None,
+            code=code.strip() if code else None,
+            limit=int(limit),
+        )
+        return {
+            "as_of": tdx_service.now_ts(),
+            "count": len(result["items"]),
+            **result,
         }
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"服务内部错误: {exc}") from exc

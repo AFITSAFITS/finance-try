@@ -664,6 +664,37 @@ def test_review_stats_api(monkeypatch) -> None:
     assert body["items"][0]["summary"] == "MACD金叉"
 
 
+def test_strategy_summary_api(monkeypatch) -> None:
+    def fake_summary(**kwargs):
+        assert kwargs["horizon"] == "T+3"
+        assert kwargs["limit"] == 20
+        return {
+            "horizon": "T+3",
+            "total_count": 1,
+            "actionable_count": 1,
+            "verdict_counts": {"保留": 1},
+            "confidence_counts": {"中": 1},
+            "items": [
+                {
+                    "strategy_type": "日线信号",
+                    "strategy_name": "60-80 / 偏多 / MACD金叉",
+                    "strategy_verdict": "保留",
+                    "strategy_confidence": "中",
+                    "strategy_actionable": True,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(api_module.strategy_summary_service, "summarize_strategy_decisions", fake_summary)
+
+    resp = client.get("/api/strategy/summary", params={"horizon": "T+3", "limit": 20})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["actionable_count"] == 1
+    assert body["items"][0]["strategy_verdict"] == "保留"
+
+
 def test_limit_up_breakthrough_api(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
 
