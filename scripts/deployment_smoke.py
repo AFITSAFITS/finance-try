@@ -48,6 +48,7 @@ def run_smoke(
     ui_url: str,
     timeout: float = 10.0,
     require_watchlist: bool = False,
+    check_strategy: bool = True,
     opener: Callable[..., object] = urlopen,
 ) -> list[str]:
     messages: list[str] = []
@@ -62,6 +63,19 @@ def run_smoke(
     if require_watchlist and count <= 0:
         raise RuntimeError("默认股票池为空")
     messages.append(f"watchlist count={count}")
+
+    if check_strategy:
+        strategy = fetch_json(
+            _join_url(api_url, "/api/strategy/summary?horizon=T%2B3&limit=1"),
+            timeout=timeout,
+            opener=opener,
+        )
+        if "items" not in strategy or "total_count" not in strategy:
+            raise RuntimeError(f"策略结论接口返回异常: {strategy}")
+        messages.append(
+            f"strategy summary total={strategy.get('total_count', 0)} "
+            f"filtered={strategy.get('filtered_count', 0)}"
+        )
 
     ui_html = fetch_text(ui_url, timeout=timeout, opener=opener)
     if not ui_html.strip():
@@ -81,6 +95,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Fail if the default watchlist is empty.",
     )
+    parser.add_argument(
+        "--skip-strategy-check",
+        action="store_true",
+        help="Skip the strategy summary API check.",
+    )
     return parser.parse_args()
 
 
@@ -92,6 +111,7 @@ def main() -> int:
             ui_url=args.ui_url,
             timeout=float(args.timeout),
             require_watchlist=bool(args.require_watchlist),
+            check_strategy=not bool(args.skip_strategy_check),
         ):
             print(message)
     except (HTTPError, URLError, TimeoutError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
