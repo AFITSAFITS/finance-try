@@ -214,8 +214,10 @@ python scripts/get_stock_data.py realtime-quotes --codes 600519,000001
 python scripts/review_signal_outcomes.py
 python scripts/review_signal_outcomes.py --trade-date 2026-04-08 --summary-horizon T+3
 python scripts/review_signal_outcomes.py --target limit-up --trade-date 2026-05-12 --summary-horizon T+3
+python scripts/review_signal_outcomes.py --stats-only --summary-horizon T+3
 ```
 
+`--stats-only` 只读取已经保存的复盘结果，不会重新请求外部行情源，适合日常快速查看统计。
 日线复盘统计会同时按评分区间、信号方向、风险提示和止损距离分层，并展示平均 60 日位置、平均量能比、平均止损距离、平均风险收益比和策略结论，便于判断哪些信号应该继续保留、观察或降权。
 
 ### 涨停突破候选

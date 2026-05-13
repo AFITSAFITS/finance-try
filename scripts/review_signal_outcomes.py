@@ -27,6 +27,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--horizons", type=str, default="1,3,5", help="Comma-separated trading-day horizons")
     parser.add_argument("--adjust", type=str, default="qfq", help="qfq / hfq / empty string")
     parser.add_argument("--summary-horizon", type=str, default="T+3", help="Summary horizon label, e.g. T+3")
+    parser.add_argument(
+        "--stats-only",
+        action="store_true",
+        help="Only summarize existing review snapshots; do not backfill from external market data",
+    )
     return parser.parse_args()
 
 
@@ -39,18 +44,19 @@ def main() -> int:
     args = parse_args()
     try:
         selected_horizons = parse_horizon_args(args.horizons)
-        signal_result = {"count": 0, "errors": []}
+        signal_result = {"count": "skipped" if args.stats_only else 0, "errors": []}
         signal_stats = []
-        limit_result = {"count": 0, "errors": []}
+        limit_result = {"count": "skipped" if args.stats_only else 0, "errors": []}
         limit_stats = []
 
         if args.target in {"signals", "both"}:
-            signal_result = review_service.backfill_review_snapshots(
-                trade_date=args.trade_date.strip() or None,
-                code=args.code.strip() or None,
-                horizons=selected_horizons,
-                adjust=args.adjust,
-            )
+            if not args.stats_only:
+                signal_result = review_service.backfill_review_snapshots(
+                    trade_date=args.trade_date.strip() or None,
+                    code=args.code.strip() or None,
+                    horizons=selected_horizons,
+                    adjust=args.adjust,
+                )
             signal_stats = review_service.summarize_review_stats(
                 horizon=args.summary_horizon.strip() or "T+3",
                 trade_date=args.trade_date.strip() or None,
@@ -58,12 +64,13 @@ def main() -> int:
             )
 
         if args.target in {"limit-up", "both"}:
-            limit_result = limit_up_service.backfill_limit_up_review_snapshots(
-                trade_date=args.trade_date.strip() or None,
-                code=args.code.strip() or None,
-                horizons=selected_horizons,
-                adjust=args.adjust,
-            )
+            if not args.stats_only:
+                limit_result = limit_up_service.backfill_limit_up_review_snapshots(
+                    trade_date=args.trade_date.strip() or None,
+                    code=args.code.strip() or None,
+                    horizons=selected_horizons,
+                    adjust=args.adjust,
+                )
             limit_stats = limit_up_service.summarize_limit_up_review_stats(
                 horizon=args.summary_horizon.strip() or "T+3",
                 trade_date=args.trade_date.strip() or None,
