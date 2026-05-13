@@ -69,6 +69,14 @@ def test_build_scan_run_health_statuses() -> None:
         error_count=0,
         signal_summary={"signals": 0, "stale_signals": 0},
     )["status"] == "无信号"
+    no_action = scan_run_service.build_scan_run_health(
+        requested_count=2,
+        event_count=1,
+        error_count=0,
+        signal_summary={"signals": 1, "stale_signals": 0, "actionable_signals": 0},
+    )
+    assert no_action["status"] == "无可观察"
+    assert no_action["note"] == "本次信号均提示不参与"
 
 
 def test_list_scan_runs_backfills_blank_legacy_status(monkeypatch, tmp_path) -> None:

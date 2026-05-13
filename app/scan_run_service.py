@@ -50,6 +50,7 @@ def build_scan_run_health(
     signal_summary: dict[str, Any],
 ) -> dict[str, str]:
     signals = int(signal_summary.get("signals") or 0)
+    actionable_signals = int(signal_summary.get("actionable_signals") or 0)
     stale_signals = int(signal_summary.get("stale_signals") or 0)
     cache_fallback_signals = int(signal_summary.get("cache_fallback_signals") or 0)
     if requested_count > 0 and error_count >= requested_count:
@@ -62,6 +63,8 @@ def build_scan_run_health(
         return {"status": "缓存兜底", "note": f"{cache_fallback_signals} 条信号使用旧缓存兜底"}
     if signals == 0 or event_count == 0:
         return {"status": "无信号", "note": "本次没有命中可保存信号"}
+    if "actionable_signals" in signal_summary and actionable_signals == 0:
+        return {"status": "无可观察", "note": "本次信号均提示不参与"}
     return {"status": "正常", "note": "扫描完成并生成信号"}
 
 

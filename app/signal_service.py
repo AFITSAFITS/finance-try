@@ -583,6 +583,9 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
             "data_source_counts": {},
             "relative_strength_bucket_counts": {},
             "position_size_counts": {},
+            "actionable_signals": 0,
+            "no_action_signals": 0,
+            "cautious_signals": 0,
             "stale_signals": 0,
             "cache_fallback_signals": 0,
         }
@@ -602,6 +605,26 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
         scores = pd.to_numeric(signal_rows["信号评分"], errors="coerce").dropna()
         if not scores.empty:
             max_score = round(float(scores.max()), 2)
+    position_counts = value_counts("观察仓位")
+    if position_counts:
+        actionable_signals = sum(
+            value
+            for label, value in position_counts.items()
+            if label not in {"0%", "-", "未标记", ""}
+        )
+        no_action_signals = int(position_counts.get("0%", 0))
+        cautious_signals = int(position_counts.get("≤10%", 0))
+    else:
+        observation_counts = value_counts("观察结论")
+        actionable_signals = sum(
+            int(observation_counts.get(label, 0))
+            for label in ("重点观察", "正常观察", "谨慎观察")
+        )
+        no_action_signals = sum(
+            int(observation_counts.get(label, 0))
+            for label in ("风险回避", "暂不参考")
+        )
+        cautious_signals = int(observation_counts.get("谨慎观察", 0))
 
     return {
         "signals": int(len(signal_rows.index)),
@@ -612,7 +635,10 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
         "direction_counts": value_counts("信号方向"),
         "data_source_counts": value_counts("数据来源"),
         "relative_strength_bucket_counts": value_counts("相对强度分层"),
-        "position_size_counts": value_counts("观察仓位"),
+        "position_size_counts": position_counts,
+        "actionable_signals": int(actionable_signals),
+        "no_action_signals": int(no_action_signals),
+        "cautious_signals": int(cautious_signals),
         "stale_signals": stale_signals,
         "cache_fallback_signals": int(value_counts("数据来源").get("旧缓存兜底", 0)),
     }

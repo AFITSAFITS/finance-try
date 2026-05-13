@@ -149,6 +149,23 @@ def test_summarize_signal_rows_counts_quality_buckets() -> None:
     assert summary["data_source_counts"] == {"旧缓存兜底": 1, "外部行情源": 1}
     assert summary["relative_strength_bucket_counts"] == {"未标记": 1, "强势": 1}
     assert summary["position_size_counts"] == {"未标记": 1, "≤30%": 1}
+    assert summary["actionable_signals"] == 1
+    assert summary["no_action_signals"] == 0
+    assert summary["cautious_signals"] == 0
+
+
+def test_summarize_signal_rows_derives_actionable_when_position_size_is_missing() -> None:
+    summary = signal_service.summarize_signal_rows(
+        pd.DataFrame(
+            [
+                {"观察结论": "重点观察", "信号评分": 85},
+                {"观察结论": "风险回避", "信号评分": 20},
+            ]
+        )
+    )
+
+    assert summary["actionable_signals"] == 1
+    assert summary["no_action_signals"] == 1
 
 
 def test_extract_candlestick_profile_detects_strong_and_upper_shadow() -> None:

@@ -650,6 +650,8 @@ def main() -> None:
             summary = data.get("signal_summary", {}) if isinstance(data.get("signal_summary"), dict) else {}
             if summary:
                 st.caption(
+                    f"可观察={summary.get('actionable_signals', 0)} | "
+                    f"建议跳过={summary.get('no_action_signals', 0)} | "
                     f"观察结论={summary.get('observation_counts', {})} | "
                     f"观察仓位={summary.get('position_size_counts', {})} | "
                     f"数据时效={summary.get('freshness_counts', {})} | "
@@ -1082,6 +1084,8 @@ def main() -> None:
             summary = data.get("signal_summary", {}) if isinstance(data.get("signal_summary"), dict) else {}
             if summary:
                 st.caption(
+                    f"可观察={summary.get('actionable_signals', 0)} | "
+                    f"建议跳过={summary.get('no_action_signals', 0)} | "
                     f"观察结论={summary.get('observation_counts', {})} | "
                     f"观察仓位={summary.get('position_size_counts', {})} | "
                     f"数据时效={summary.get('freshness_counts', {})} | "

@@ -38,6 +38,9 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
                 "signals": 2,
                 "error_count": 1,
                 "max_score": 85,
+                "actionable_signals": 2,
+                "no_action_signals": 0,
+                "cautious_signals": 1,
                 "stale_signals": 0,
                 "cache_fallback_signals": 1,
                 "observation_counts": {"重点观察": 1, "谨慎观察": 1},
@@ -72,6 +75,9 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
     assert "scan_run_id=3" in captured.out
     assert "status=正常" in captured.out
     assert "stale_signals=0" in captured.out
+    assert "actionable=2" in captured.out
+    assert "no_action=0" in captured.out
+    assert "cautious=1" in captured.out
     assert "cache_fallback_signals=1" in captured.out
     assert "data_sources={'旧缓存兜底': 1, '外部行情源': 1}" in captured.out
     assert "strength={'强势': 1, '偏弱': 1}" in captured.out
