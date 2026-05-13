@@ -1305,10 +1305,11 @@ def main() -> None:
             confidence_counts = data.get("confidence_counts") or {}
             type_counts = data.get("strategy_type_counts") or {}
             source_counts = data.get("data_source_counts") or {}
-            if verdict_counts or confidence_counts or type_counts or source_counts:
+            action_counts = data.get("next_action_counts") or {}
+            if verdict_counts or confidence_counts or type_counts or source_counts or action_counts:
                 st.caption(
                     f"结论分布={verdict_counts} | 可信度={confidence_counts} | "
-                    f"策略类型={type_counts} | 数据来源={source_counts}"
+                    f"策略类型={type_counts} | 数据来源={source_counts} | 下一步动作={action_counts}"
                 )
             strategy_df = pd.DataFrame(data.get("items", []))
             if strategy_df.empty:

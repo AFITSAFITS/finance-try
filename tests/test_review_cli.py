@@ -130,6 +130,7 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
             "confidence_counts": {"中": 1},
             "strategy_type_counts": {"日线信号": 1},
             "data_source_counts": {"本地缓存": 1},
+            "next_action_counts": {"保留该分组": 1},
             "items": [
                 {
                     "strategy_type": "日线信号",
@@ -180,6 +181,7 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     assert "data_source=本地缓存" in captured.out
     assert "types={'日线信号': 1}" in captured.out
     assert "sources={'本地缓存': 1}" in captured.out
+    assert "actions={'保留该分组': 1}" in captured.out
     assert "type=日线信号" in captured.out
     assert "next_action=保留该分组" in captured.out
     assert "verdict=保留" in captured.out
@@ -206,6 +208,7 @@ def test_review_cli_prints_strategy_summary_json(monkeypatch, capsys) -> None:
             "confidence_counts": {"中": 1},
             "strategy_type_counts": {"日线信号": 1},
             "data_source_counts": {"本地缓存": 1},
+            "next_action_counts": {"保留该分组": 1},
             "items": [{"strategy_type": "日线信号", "strategy_next_action": "保留该分组"}],
         },
     )
@@ -245,6 +248,7 @@ def test_review_cli_require_actionable_returns_2_when_empty(monkeypatch, capsys)
             "confidence_counts": {},
             "strategy_type_counts": {},
             "data_source_counts": {},
+            "next_action_counts": {},
             "items": [],
         },
     )
