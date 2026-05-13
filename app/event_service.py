@@ -51,6 +51,8 @@ def _signal_payload(row: dict[str, object]) -> dict[str, object]:
         "return_60d": _clean_number(row.get("60日涨幅")),
         "relative_strength": _clean_number(row.get("相对强度")),
         "relative_strength_bucket": row.get("相对强度分层"),
+        "main_net_inflow_yi": _clean_number(row.get("主力净流入(亿)")),
+        "flow_confirmation": row.get("资金流确认"),
         "candlestick_pattern": row.get("K线形态"),
         "candlestick_note": row.get("K线提示"),
         "stop_loss_price": _clean_number(row.get("参考止损")),

@@ -58,6 +58,7 @@ class DailySignalsRequest(BaseModel):
     max_workers: int = Field(default=8, ge=1, le=32)
     only_secondary_golden_cross: bool = False
     min_score: float | None = Field(default=None, ge=0, le=100)
+    include_flow: bool = False
 
 
 class DefaultWatchlistRequest(BaseModel):
@@ -311,6 +312,13 @@ def api_daily_signals(req: DailySignalsRequest) -> dict[str, Any]:
             raise ValueError("至少提供一个股票代码")
 
         started_at = time.perf_counter()
+        flow_fetcher = None
+        if req.include_flow:
+            flow_fetcher = lambda flow_codes: tdx_service.flow_rank_akshare_for_codes(
+                flow_codes,
+                min_net_inflow=float("-inf"),
+                limit=len(flow_codes),
+            )
         df, errors = signal_service.scan_stock_signal_events(
             codes=codes,
             lookback_days=int(req.lookback_days),
@@ -319,6 +327,7 @@ def api_daily_signals(req: DailySignalsRequest) -> dict[str, Any]:
             max_workers=int(req.max_workers),
             only_secondary_golden_cross=bool(req.only_secondary_golden_cross),
             min_score=req.min_score,
+            flow_fetcher=flow_fetcher,
         )
         items = tdx_service.dataframe_to_records(df)
         return {

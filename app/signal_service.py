@@ -48,6 +48,8 @@ SIGNAL_OUTPUT_COLUMNS = [
     "60日涨幅",
     "相对强度",
     "相对强度分层",
+    "主力净流入(亿)",
+    "资金流确认",
     "K线形态",
     "K线提示",
     "参考止损",
@@ -571,6 +573,65 @@ def apply_relative_strength(
         row["风险提示"] = "；".join(dict.fromkeys(risks)) if risks else "无明显风险"
 
 
+def _flow_net_inflow_cny(flow_row: pd.Series) -> float | None:
+    for column in ("主力净流入_元", "净额_元"):
+        if column in flow_row and not pd.isna(flow_row[column]):
+            return float(flow_row[column])
+    for column in ("主力净流入(亿)", "净流入(亿)"):
+        if column in flow_row and not pd.isna(flow_row[column]):
+            return float(flow_row[column]) * 1e8
+    return None
+
+
+def apply_flow_confirmation(rows_by_code: dict[str, dict[str, object]], flow_df: pd.DataFrame) -> None:
+    if not rows_by_code or flow_df.empty or "股票代码" not in flow_df.columns:
+        return
+
+    flow_by_code = {
+        tdx_service.format_code(item["股票代码"]): item
+        for _, item in flow_df.iterrows()
+        if not pd.isna(item.get("股票代码"))
+    }
+    for code, row in rows_by_code.items():
+        flow_row = flow_by_code.get(code)
+        if flow_row is None:
+            row["资金流确认"] = "未获取"
+            continue
+
+        net_inflow = _flow_net_inflow_cny(flow_row)
+        if net_inflow is None or pd.isna(net_inflow):
+            row["资金流确认"] = "未获取"
+            continue
+
+        row["主力净流入(亿)"] = round(float(net_inflow) / 1e8, 4)
+        direction = str(row.get("信号方向") or "")
+        score = float(row.get("信号评分", 0) or 0)
+        reasons = [part for part in str(row.get("评分原因") or "").split("；") if part]
+        risks = [part for part in str(row.get("风险提示") or "").split("；") if part and part != "无明显风险"]
+
+        if direction == "偏多" and net_inflow >= 20_000_000:
+            row["资金流确认"] = "资金支持"
+            score += 5
+            reasons.append("资金流入支持")
+        elif direction == "偏多" and net_inflow < 0:
+            row["资金流确认"] = "资金背离"
+            score -= 8
+            risks.append("资金流出")
+        elif direction == "偏空" and net_inflow < 0:
+            row["资金流确认"] = "资金流出确认"
+            reasons.append("资金流出确认")
+        else:
+            row["资金流确认"] = "资金中性"
+
+        bounded_score = max(0.0, min(100.0, score))
+        row["信号评分"] = round(bounded_score, 2)
+        row["信号级别"] = _signal_level(bounded_score)
+        row["评分原因"] = "；".join(dict.fromkeys(reasons))
+        row["风险提示"] = "；".join(dict.fromkeys(risks)) if risks else "无明显风险"
+        apply_observation_conclusion(row)
+        apply_execution_hint(row)
+
+
 def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]] | None = None) -> dict[str, object]:
     if signal_rows.empty:
         return {
@@ -582,6 +643,7 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
             "direction_counts": {},
             "data_source_counts": {},
             "relative_strength_bucket_counts": {},
+            "flow_confirmation_counts": {},
             "position_size_counts": {},
             "actionable_signals": 0,
             "no_action_signals": 0,
@@ -635,6 +697,7 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
         "direction_counts": value_counts("信号方向"),
         "data_source_counts": value_counts("数据来源"),
         "relative_strength_bucket_counts": value_counts("相对强度分层"),
+        "flow_confirmation_counts": value_counts("资金流确认"),
         "position_size_counts": position_counts,
         "actionable_signals": int(actionable_signals),
         "no_action_signals": int(no_action_signals),
@@ -692,6 +755,8 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
         if "VOL20" not in curr_row or pd.isna(curr_row["VOL20"]) or pd.isna(curr_row.get("成交量")) or float(curr_row["VOL20"]) == 0
         else round(float(curr_row["成交量"]) / float(curr_row["VOL20"]), 4),
         "均线信号": ma_signal,
+        "主力净流入(亿)": None,
+        "资金流确认": "未获取",
         "信号": ", ".join(signals),
     }
     row.update(extract_candlestick_profile(curr_row))
@@ -1058,6 +1123,7 @@ def scan_stock_signal_events(
     max_workers: int = 8,
     only_secondary_golden_cross: bool = False,
     min_score: float | None = None,
+    flow_fetcher: Callable[[list[str]], pd.DataFrame] | None = None,
 ) -> tuple[pd.DataFrame, list[dict[str, str]]]:
     normalized_codes = tdx_service.validate_codes(codes)
 
@@ -1103,6 +1169,12 @@ def scan_stock_signal_events(
                     errors_by_code[fetched_code] = error
 
     apply_relative_strength(rows_by_code, metrics_by_code)
+    if flow_fetcher and rows_by_code:
+        try:
+            flow_df = flow_fetcher(list(rows_by_code.keys()))
+            apply_flow_confirmation(rows_by_code, flow_df)
+        except Exception as exc:  # noqa: BLE001
+            errors_by_code["资金流"] = str(exc)
     if min_score is not None:
         rows_by_code = {
             code: row

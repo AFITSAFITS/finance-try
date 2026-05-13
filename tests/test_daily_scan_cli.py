@@ -47,6 +47,7 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
                 "freshness_counts": {"最近交易日": 2},
                 "data_source_counts": {"旧缓存兜底": 1, "外部行情源": 1},
                 "relative_strength_bucket_counts": {"强势": 1, "偏弱": 1},
+                "flow_confirmation_counts": {"资金支持": 1, "资金背离": 1},
                 "position_size_counts": {"≤30%": 1, "≤10%": 1},
             },
             "strategy_guard": {"horizon": "T+1", "matched_count": 1, "total_count": 2, "mute_downgraded": True, "muted_count": 1},
@@ -81,6 +82,7 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
     assert "cache_fallback_signals=1" in captured.out
     assert "data_sources={'旧缓存兜底': 1, '外部行情源': 1}" in captured.out
     assert "strength={'强势': 1, '偏弱': 1}" in captured.out
+    assert "flow={'资金支持': 1, '资金背离': 1}" in captured.out
     assert "positions={'≤30%': 1, '≤10%': 1}" in captured.out
     assert "strategy_guard horizon=T+1 matched=1 total=2 mute_downgraded=True muted=1" in captured.out
     assert "默认股票池" in captured.out

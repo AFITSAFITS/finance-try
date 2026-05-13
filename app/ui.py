@@ -618,6 +618,7 @@ def main() -> None:
         max_workers = int(c3.number_input("并发数", min_value=1, max_value=32, value=8, step=1))
         min_signal_score = float(c4.number_input("最低评分", min_value=0.0, max_value=100.0, value=0.0, step=5.0))
         only_secondary_golden_cross = st.checkbox("仅保留“水下金叉后水上再次金叉”", value=False)
+        include_flow = st.checkbox("同时检查资金流", value=False)
 
         if st.button("扫描今日新信号", type="primary"):
             payload = {
@@ -627,6 +628,7 @@ def main() -> None:
                 "max_workers": max_workers,
                 "only_secondary_golden_cross": only_secondary_golden_cross,
                 "min_score": min_signal_score,
+                "include_flow": include_flow,
             }
             try:
                 data = request_api(
@@ -654,6 +656,7 @@ def main() -> None:
                     f"建议跳过={summary.get('no_action_signals', 0)} | "
                     f"观察结论={summary.get('observation_counts', {})} | "
                     f"观察仓位={summary.get('position_size_counts', {})} | "
+                    f"资金流={summary.get('flow_confirmation_counts', {})} | "
                     f"数据时效={summary.get('freshness_counts', {})} | "
                     f"最高评分={summary.get('max_score', '-')}"
                 )
@@ -688,6 +691,8 @@ def main() -> None:
                 "60日涨幅",
                 "相对强度",
                 "相对强度分层",
+                "主力净流入(亿)",
+                "资金流确认",
                 "K线形态",
                 "K线提示",
                 "参考止损",
@@ -1088,6 +1093,7 @@ def main() -> None:
                     f"建议跳过={summary.get('no_action_signals', 0)} | "
                     f"观察结论={summary.get('observation_counts', {})} | "
                     f"观察仓位={summary.get('position_size_counts', {})} | "
+                    f"资金流={summary.get('flow_confirmation_counts', {})} | "
                     f"数据时效={summary.get('freshness_counts', {})} | "
                     f"最高评分={summary.get('max_score', '-')}"
                 )

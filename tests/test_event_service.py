@@ -35,6 +35,8 @@ def test_persist_signal_rows_dedupes_events(monkeypatch, tmp_path) -> None:
                 "评分原因": "多指标共振",
                 "相对强度": 92.0,
                 "相对强度分层": "强势",
+                "主力净流入(亿)": 0.3,
+                "资金流确认": "资金支持",
             }
         ]
     )
@@ -63,6 +65,8 @@ def test_persist_signal_rows_dedupes_events(monkeypatch, tmp_path) -> None:
     assert history[0]["payload"]["execution_hint"] == "优先观察，跌破参考止损退出"
     assert history[0]["payload"]["relative_strength"] == 92.0
     assert history[0]["payload"]["relative_strength_bucket"] == "强势"
+    assert history[0]["payload"]["main_net_inflow_yi"] == 0.3
+    assert history[0]["payload"]["flow_confirmation"] == "资金支持"
 
     updated_df = df.copy()
     updated_df.loc[0, "信号评分"] = 72

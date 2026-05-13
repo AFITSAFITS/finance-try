@@ -247,6 +247,7 @@ def test_daily_signals_success(monkeypatch) -> None:
         assert kwargs["codes"] == ["600592", "600487"]
         assert kwargs["only_secondary_golden_cross"] is False
         assert kwargs["min_score"] == 60
+        assert kwargs["flow_fetcher"] is None
         return (
             pd.DataFrame(
                 [
@@ -294,6 +295,52 @@ def test_daily_signals_success(monkeypatch) -> None:
     assert body["signal_summary"]["observation_counts"] == {"重点观察": 1}
     assert body["signal_summary"]["freshness_counts"] == {"最近交易日": 1}
     assert body["errors"][0]["股票代码"] == "600487"
+
+
+def test_daily_signals_can_include_flow(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_flow_rank_akshare_for_codes(codes, min_net_inflow, limit):
+        captured["flow_codes"] = codes
+        captured["min_net_inflow"] = min_net_inflow
+        captured["limit"] = limit
+        return pd.DataFrame([{"股票代码": "600592", "主力净流入_元": 30_000_000}])
+
+    def fake_scan_stock_signal_events(**kwargs):
+        captured["flow_fetcher"] = kwargs["flow_fetcher"]
+        flow_df = kwargs["flow_fetcher"](["600592"])
+        assert list(flow_df["股票代码"]) == ["600592"]
+        return (
+            pd.DataFrame(
+                [
+                    {
+                        "股票代码": "600592",
+                        "日期": "2026-04-08",
+                        "收盘": 12.3,
+                        "信号评分": 95,
+                        "观察结论": "重点观察",
+                        "资金流确认": "资金支持",
+                    }
+                ]
+            ),
+            [],
+        )
+
+    monkeypatch.setattr(api_module.tdx_service, "flow_rank_akshare_for_codes", fake_flow_rank_akshare_for_codes)
+    monkeypatch.setattr(api_module.signal_service, "scan_stock_signal_events", fake_scan_stock_signal_events)
+
+    resp = client.post(
+        "/api/signals/daily",
+        json={"codes_text": "600592", "include_flow": True},
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["items"][0]["资金流确认"] == "资金支持"
+    assert callable(captured["flow_fetcher"])
+    assert captured["flow_codes"] == ["600592"]
+    assert captured["min_net_inflow"] == float("-inf")
+    assert captured["limit"] == 1
 
 
 def test_daily_signals_secondary_golden_cross_filter(monkeypatch) -> None:

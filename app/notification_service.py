@@ -33,6 +33,8 @@ def format_event_message(event: dict[str, Any]) -> str:
     volume_ratio = _format_number(payload.get("volume_ratio"))
     relative_strength = _format_number(payload.get("relative_strength"))
     relative_strength_bucket = _clean_display(payload.get("relative_strength_bucket"))
+    main_net_inflow_yi = _format_number(payload.get("main_net_inflow_yi"))
+    flow_confirmation = _clean_display(payload.get("flow_confirmation"))
     candlestick_pattern = _clean_display(payload.get("candlestick_pattern"))
     stop_loss_price = _format_number(payload.get("stop_loss_price"))
     target_price = _format_number(payload.get("target_price"))
@@ -47,6 +49,7 @@ def format_event_message(event: dict[str, Any]) -> str:
         f"data_freshness={data_freshness} | data_source={data_source} | "
         f"position_60d={position_60d} | volume_ratio={volume_ratio} | "
         f"relative_strength={relative_strength} | strength_bucket={relative_strength_bucket} | "
+        f"flow={flow_confirmation} | net_inflow_yi={main_net_inflow_yi} | "
         f"candlestick={candlestick_pattern} | "
         f"stop_loss={stop_loss_price} | target={target_price} | risk={risk_note} | "
         f"strategy={strategy_verdict} | strategy_confidence={strategy_confidence} | "
@@ -111,6 +114,8 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
     volume_ratio = _format_number(payload.get("volume_ratio"))
     relative_strength = _format_number(payload.get("relative_strength"))
     relative_strength_bucket = _clean_display(payload.get("relative_strength_bucket"))
+    main_net_inflow_yi = _format_number(payload.get("main_net_inflow_yi"))
+    flow_confirmation = _clean_display(payload.get("flow_confirmation"))
     candlestick_pattern = _clean_display(payload.get("candlestick_pattern"))
     stop_loss_price = _format_number(payload.get("stop_loss_price"))
     target_price = _format_number(payload.get("target_price"))
@@ -160,6 +165,8 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**量能比**\n{volume_ratio}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**相对强度**\n{relative_strength}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**强弱分层**\n{relative_strength_bucket}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**资金流**\n{flow_confirmation}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**净流入(亿)**\n{main_net_inflow_yi}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**K线形态**\n{candlestick_pattern}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**参考止损**\n{stop_loss_price}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**参考目标**\n{target_price}"}},

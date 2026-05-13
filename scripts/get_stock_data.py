@@ -226,6 +226,7 @@ def print_signal_summary(summary: dict[str, object]) -> None:
         f"freshness={format_counts(summary.get('freshness_counts', {}))} "
         f"data_sources={format_counts(summary.get('data_source_counts', {}))} "
         f"strength={format_counts(summary.get('relative_strength_bucket_counts', {}))} "
+        f"flow={format_counts(summary.get('flow_confirmation_counts', {}))} "
         f"positions={format_counts(summary.get('position_size_counts', {}))} "
         f"directions={format_counts(summary.get('direction_counts', {}))}"
     )
@@ -281,6 +282,7 @@ def parse_args() -> argparse.Namespace:
     p_signal.add_argument("--adjust", type=str, default="qfq", help="qfq / hfq / empty string")
     p_signal.add_argument("--max-workers", type=int, default=8, help="Parallel fetch workers")
     p_signal.add_argument("--min-score", type=float, default=0, help="Only keep signals with score >= this value")
+    p_signal.add_argument("--include-flow", action="store_true", help="Enrich daily signals with AkShare fund flow")
     p_signal.add_argument(
         "--only-secondary-golden-cross",
         action="store_true",
@@ -411,6 +413,7 @@ def main() -> int:
                 max_workers=int(args.max_workers),
                 only_secondary_golden_cross=bool(args.only_secondary_golden_cross),
                 min_score=float(args.min_score),
+                flow_fetcher=flow_for_codes_akshare if args.include_flow else None,
             )
             for error in errors:
                 print(
@@ -439,6 +442,8 @@ def main() -> int:
                 "60日涨幅",
                 "相对强度",
                 "相对强度分层",
+                "主力净流入(亿)",
+                "资金流确认",
                 "K线形态",
                 "K线提示",
                 "参考止损",

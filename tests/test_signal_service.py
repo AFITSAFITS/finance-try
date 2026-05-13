@@ -133,6 +133,7 @@ def test_summarize_signal_rows_counts_quality_buckets() -> None:
                     "信号方向": "偏多",
                     "信号评分": 86,
                     "相对强度分层": "强势",
+                    "资金流确认": "资金支持",
                 },
             ]
         ),
@@ -148,6 +149,7 @@ def test_summarize_signal_rows_counts_quality_buckets() -> None:
     assert summary["freshness_counts"] == {"最近交易日": 1, "数据可能滞后": 1}
     assert summary["data_source_counts"] == {"旧缓存兜底": 1, "外部行情源": 1}
     assert summary["relative_strength_bucket_counts"] == {"未标记": 1, "强势": 1}
+    assert summary["flow_confirmation_counts"] == {"未标记": 1, "资金支持": 1}
     assert summary["position_size_counts"] == {"未标记": 1, "≤30%": 1}
     assert summary["actionable_signals"] == 1
     assert summary["no_action_signals"] == 0
@@ -282,6 +284,45 @@ def test_apply_execution_hint_uses_observation_and_data_quality() -> None:
     assert stale_row["观察仓位"] == "0%"
     assert "刷新行情" in stale_row["执行提示"]
     assert bearish_row["观察仓位"] == "0%"
+
+
+def test_apply_flow_confirmation_adjusts_bullish_signal_quality() -> None:
+    rows = {
+        "600001": {
+            "股票代码": "600001",
+            "信号方向": "偏多",
+            "信号评分": 70,
+            "信号级别": "观察",
+            "评分原因": "MACD金叉",
+            "风险提示": "无明显风险",
+            "观察结论": "正常观察",
+        },
+        "600002": {
+            "股票代码": "600002",
+            "信号方向": "偏多",
+            "信号评分": 70,
+            "信号级别": "观察",
+            "评分原因": "MACD金叉",
+            "风险提示": "无明显风险",
+            "观察结论": "正常观察",
+        },
+    }
+    flow_df = pd.DataFrame(
+        [
+            {"股票代码": "600001", "主力净流入_元": 30_000_000},
+            {"股票代码": "600002", "主力净流入_元": -10_000_000},
+        ]
+    )
+
+    signal_service.apply_flow_confirmation(rows, flow_df)
+
+    assert rows["600001"]["资金流确认"] == "资金支持"
+    assert rows["600001"]["主力净流入(亿)"] == 0.3
+    assert rows["600001"]["信号评分"] == 75
+    assert "资金流入支持" in rows["600001"]["评分原因"]
+    assert rows["600002"]["资金流确认"] == "资金背离"
+    assert rows["600002"]["信号评分"] == 62
+    assert "资金流出" in rows["600002"]["风险提示"]
 
 
 def test_scan_stock_signal_events_collects_fetch_errors() -> None:
