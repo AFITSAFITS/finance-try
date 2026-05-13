@@ -100,3 +100,55 @@ def test_review_cli_stats_only_skips_limit_up_backfill(monkeypatch, capsys) -> N
     captured = capsys.readouterr()
     assert called == {"backfill": False, "stats": True}
     assert "limit_up_review_snapshots=skipped" in captured.out
+
+
+def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
+    module = load_module()
+    called = {"strategy": False}
+
+    monkeypatch.setattr(module.review_service, "summarize_review_stats", lambda **kwargs: [])
+    monkeypatch.setattr(module.limit_up_service, "summarize_limit_up_review_stats", lambda **kwargs: [])
+
+    def fake_summarize_strategy_decisions(**kwargs):
+        called["strategy"] = True
+        assert kwargs["horizon"] == "T+3"
+        assert kwargs["limit"] == 5
+        return {
+            "horizon": "T+3",
+            "total_count": 1,
+            "actionable_count": 1,
+            "verdict_counts": {"保留": 1},
+            "confidence_counts": {"中": 1},
+            "items": [
+                {
+                    "strategy_type": "日线信号",
+                    "strategy_name": "60-80 / 偏多 / MACD金叉",
+                    "horizon": "T+3",
+                    "data_source": "本地缓存",
+                    "sample_count": 6,
+                    "avg_return": 2.1,
+                    "win_rate": 0.6,
+                    "avg_max_drawdown": -3.2,
+                    "strategy_verdict": "保留",
+                    "strategy_confidence": "中",
+                    "strategy_actionable": True,
+                    "strategy_note": "表现可接受",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(module.strategy_summary_service, "summarize_strategy_decisions", fake_summarize_strategy_decisions)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [str(REVIEW_SCRIPT), "--stats-only", "--strategy-summary", "--strategy-limit", "5"],
+    )
+
+    assert module.main() == 0
+    captured = capsys.readouterr()
+    assert called == {"strategy": True}
+    assert "strategy_summary" in captured.out
+    assert "total=1" in captured.out
+    assert "actionable=1" in captured.out
+    assert "type=日线信号" in captured.out
+    assert "verdict=保留" in captured.out

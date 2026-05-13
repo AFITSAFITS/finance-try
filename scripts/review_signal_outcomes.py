@@ -11,6 +11,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from app import limit_up_service
 from app import review_service
+from app import strategy_summary_service
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,6 +33,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only summarize existing review snapshots; do not backfill from external market data",
     )
+    parser.add_argument(
+        "--strategy-summary",
+        action="store_true",
+        help="Print a unified strategy decision summary across signal and limit-up reviews",
+    )
+    parser.add_argument("--strategy-limit", type=int, default=20, help="Maximum unified strategy rows to print")
     return parser.parse_args()
 
 
@@ -48,6 +55,7 @@ def main() -> int:
         signal_stats = []
         limit_result = {"count": "skipped" if args.stats_only else 0, "errors": []}
         limit_stats = []
+        strategy_summary: dict[str, object] | None = None
 
         if args.target in {"signals", "both"}:
             if not args.stats_only:
@@ -75,6 +83,14 @@ def main() -> int:
                 horizon=args.summary_horizon.strip() or "T+3",
                 trade_date=args.trade_date.strip() or None,
                 code=args.code.strip() or None,
+            )
+
+        if args.strategy_summary:
+            strategy_summary = strategy_summary_service.summarize_strategy_decisions(
+                horizon=args.summary_horizon.strip() or "T+3",
+                trade_date=args.trade_date.strip() or None,
+                code=args.code.strip() or None,
+                limit=int(args.strategy_limit),
             )
     except Exception as exc:  # noqa: BLE001
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -124,6 +140,26 @@ def main() -> int:
             )
     elif args.target in {"limit-up", "both"}:
         print("没有可用的涨停候选复盘统计结果。")
+
+    if strategy_summary is not None:
+        print("\nstrategy_summary")
+        print(
+            f"horizon={strategy_summary['horizon']} | total={strategy_summary['total_count']} | "
+            f"actionable={strategy_summary['actionable_count']} | "
+            f"verdicts={strategy_summary['verdict_counts']} | confidence={strategy_summary['confidence_counts']}"
+        )
+        items = strategy_summary.get("items", [])
+        if not items:
+            print("没有可用的统一策略结论。")
+        for item in items:
+            print(
+                f"type={item['strategy_type']} | name={item['strategy_name']} | horizon={item['horizon']} | "
+                f"data_source={item['data_source']} | samples={item['sample_count']} | "
+                f"avg_return={item['avg_return']} | win_rate={item['win_rate']} | "
+                f"avg_max_drawdown={item['avg_max_drawdown']} | verdict={item['strategy_verdict']} | "
+                f"confidence={item['strategy_confidence']} | actionable={item['strategy_actionable']} | "
+                f"note={item['strategy_note']}"
+            )
     return 0
 
 
