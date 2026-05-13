@@ -17,6 +17,140 @@ DEFAULT_THSDK_SYMBOL = "USZA300033"
 DEFAULT_NOTIFICATION_CHANNEL = os.getenv("AI_FINANCE_NOTIFICATION_CHANNEL", "stdout").strip() or "stdout"
 
 
+def inject_page_style() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --surface: #f3f6f1;
+            --surface-strong: #e3eae0;
+            --ink: #1f2923;
+            --muted: #667066;
+            --line: #ccd8c8;
+            --accent: #2d6a4f;
+            --accent-soft: #dfeade;
+            --warn-soft: #f5e3c7;
+            --bad-soft: #eed5d1;
+        }
+        .stApp {
+            background: var(--surface);
+            color: var(--ink);
+        }
+        section[data-testid="stSidebar"] {
+            background: #e7eee4;
+            border-right: 1px solid var(--line);
+        }
+        .block-container {
+            padding-top: 1.8rem;
+            padding-bottom: 4rem;
+            max-width: 1500px;
+        }
+        h1, h2, h3 {
+            color: var(--ink);
+            letter-spacing: 0;
+        }
+        div[data-testid="stMetric"] {
+            background: #fbfcf8;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 14px 16px;
+        }
+        div[data-testid="stMetricLabel"] p {
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+        div[data-testid="stMetricValue"] {
+            color: var(--ink);
+            font-size: 1.45rem;
+        }
+        div[data-testid="stTabs"] button {
+            border-radius: 0;
+            color: var(--muted);
+            font-weight: 600;
+        }
+        div[data-testid="stTabs"] button[aria-selected="true"] {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .workbench-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.8fr);
+            gap: 18px;
+            align-items: stretch;
+            margin-bottom: 18px;
+        }
+        .workbench-panel {
+            background: #fbfcf8;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 20px 22px;
+        }
+        .workbench-title {
+            margin: 0;
+            font-size: clamp(1.9rem, 3vw, 3.1rem);
+            line-height: 1.05;
+            font-weight: 760;
+            letter-spacing: 0;
+        }
+        .workbench-subtitle {
+            margin: 12px 0 0;
+            max-width: 780px;
+            color: var(--muted);
+            line-height: 1.65;
+            font-size: 0.98rem;
+        }
+        .status-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 18px;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 28px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: var(--accent-soft);
+            color: #244b3b;
+            font-size: 0.82rem;
+            font-weight: 650;
+        }
+        .status-pill.warn {
+            background: var(--warn-soft);
+            color: #755018;
+        }
+        .status-pill.bad {
+            background: var(--bad-soft);
+            color: #78362e;
+        }
+        .quick-list {
+            margin: 0;
+            padding-left: 1rem;
+            color: var(--muted);
+            line-height: 1.7;
+            font-size: 0.92rem;
+        }
+        .quick-list strong {
+            color: var(--ink);
+            font-weight: 700;
+        }
+        @media (max-width: 900px) {
+            .workbench-hero {
+                grid-template-columns: 1fr;
+            }
+            .block-container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def request_api(
     base_url: str,
     path: str,
@@ -50,7 +184,7 @@ def df_to_csv_bytes(df: pd.DataFrame) -> bytes:
 
 
 def show_downloadable_table(df: pd.DataFrame, file_name: str) -> None:
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df, width="stretch")
     st.download_button(
         "下载 CSV",
         data=df_to_csv_bytes(df),
@@ -82,14 +216,105 @@ def show_event_table(items: list[dict], file_name: str) -> None:
     show_downloadable_table(df, file_name)
 
 
-def main() -> None:
-    st.set_page_config(page_title="TDX 主力净流入看板", layout="wide")
-    st.title("股票数据查询")
+def render_status_pill(label: str, tone: str = "ok") -> str:
+    cls = "status-pill"
+    if tone in {"warn", "bad"}:
+        cls = f"{cls} {tone}"
+    return f'<span class="{cls}">{label}</span>'
 
+
+def render_workbench_header(api_base: str) -> None:
+    health: dict | None = None
+    watchlist: dict | None = None
+    latest_run: dict | None = None
+    status_notes: list[str] = []
+
+    try:
+        health = request_api(api_base, "/health", method="GET", timeout_seconds=5)
+    except Exception as exc:  # noqa: BLE001
+        status_notes.append(f"API 暂不可用：{exc}")
+
+    try:
+        watchlist = request_api(api_base, "/api/watchlists/default", method="GET", timeout_seconds=10)
+    except Exception as exc:  # noqa: BLE001
+        status_notes.append(f"股票池读取失败：{exc}")
+
+    try:
+        runs = request_api(api_base, "/api/signals/scan-runs", method="GET", params={"limit": 1}, timeout_seconds=10)
+        run_items = runs.get("items", [])
+        if run_items:
+            latest_run = run_items[0]
+    except Exception as exc:  # noqa: BLE001
+        status_notes.append(f"运行记录读取失败：{exc}")
+
+    api_tone = "ok" if health and health.get("ok") else "bad"
+    watchlist_count = int(watchlist.get("count", 0)) if watchlist else 0
+    watchlist_tone = "ok" if watchlist_count > 0 else "warn"
+    run_status = str(latest_run.get("status", "暂无记录")) if latest_run else "暂无记录"
+    run_tone = "ok" if run_status == "正常" else "warn"
+    if run_status in {"失败", "部分失败"}:
+        run_tone = "bad"
+
+    st.markdown(
+        f"""
+        <div class="workbench-hero">
+          <section class="workbench-panel">
+            <h1 class="workbench-title">AI Finance 工作台</h1>
+            <p class="workbench-subtitle">
+              日常看盘从这里开始：先看服务状态和股票池，再做实时行情、默认池扫描、复盘统计和策略观察。
+            </p>
+            <div class="status-strip">
+              {render_status_pill("API 正常" if api_tone == "ok" else "API 异常", api_tone)}
+              {render_status_pill(f"默认股票池 {watchlist_count} 只", watchlist_tone)}
+              {render_status_pill(f"最近运行：{run_status}", run_tone)}
+              {render_status_pill(f"数据源：{health.get('provider', '-') if health else '-'}", "ok" if health else "warn")}
+            </div>
+          </section>
+          <aside class="workbench-panel">
+            <ul class="quick-list">
+              <li><strong>盘中</strong>：先查实时行情和观察提示。</li>
+              <li><strong>收盘后</strong>：执行默认股票池扫描。</li>
+              <li><strong>复盘</strong>：查看止损、目标和后续表现。</li>
+              <li><strong>维护</strong>：股票池、板块和涨停候选单独管理。</li>
+            </ul>
+          </aside>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("服务时间", health.get("as_of", "-") if health else "-")
+    c2.metric("默认股票池", watchlist_count)
+    c3.metric("最近扫描事件", latest_run.get("event_count", "-") if latest_run else "-")
+    c4.metric("最近扫描错误", latest_run.get("error_count", "-") if latest_run else "-")
+
+    if latest_run and latest_run.get("note"):
+        st.caption(f"最近扫描说明：{latest_run.get('note')}")
+    for note in status_notes:
+        st.warning(note)
+
+
+def main() -> None:
+    st.set_page_config(page_title="AI Finance 工作台", layout="wide")
+    inject_page_style()
+
+    st.sidebar.title("AI Finance")
     api_base = st.sidebar.text_input(
         "API 地址",
         value=os.getenv("API_BASE_URL", "http://127.0.0.1:8000"),
     )
+    st.sidebar.caption("改地址后，页面所有操作都会请求新的 API。")
+    st.sidebar.divider()
+    st.sidebar.markdown(
+        "**常用顺序**\n\n"
+        "1. 实时行情\n"
+        "2. 今日提醒\n"
+        "3. 复盘统计\n"
+        "4. 股票池维护"
+    )
+
+    render_workbench_header(api_base)
 
     with st.expander("说明", expanded=False):
         st.markdown(
@@ -110,9 +335,9 @@ def main() -> None:
         kline_tab,
     ) = st.tabs(
         [
-            "主力净流入",
+            "资金流",
             "实时行情",
-            "日线信号扫描",
+            "日线信号",
             "涨停突破",
             "板块轮动",
             "今日提醒",
@@ -621,7 +846,7 @@ def main() -> None:
                     )
                     .sort_index()
                 )
-                st.line_chart(chart_df, use_container_width=True)
+                st.line_chart(chart_df, width="stretch")
                 cols = ["trade_date", "sector_name", "rotation_score", "activity_score", "position_60d", "signal", "created_at"]
                 show_downloadable_table(df[[c for c in cols if c in df.columns]], "sector_rotation_trends.csv")
 
