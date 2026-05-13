@@ -13,6 +13,8 @@ def make_history(code: str) -> pd.DataFrame:
             "股票代码": [code] * len(closes),
             "收盘": closes,
             "涨跌幅": [0.0] * (len(closes) - 1) + [10.0],
+            "数据来源": ["旧缓存兜底"] * len(closes),
+            "缓存获取时间": ["2026-01-01 00:00:00"] * len(closes),
         }
     )
 
@@ -63,6 +65,8 @@ def test_scan_limit_up_breakthroughs_scores_and_filters() -> None:
     assert "涨停" in first["reason"]
     assert first["sector_limit_up_count"] == 2
     assert first["sector_heat_rank"] == 1
+    assert first["payload"]["data_source"] == "旧缓存兜底"
+    assert first["payload"]["cache_fetched_at"] == "2026-01-01 00:00:00"
     assert "共振" in first["reason"]
 
 

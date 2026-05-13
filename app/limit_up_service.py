@@ -125,7 +125,7 @@ def analyze_limit_up_candidate(
     row: dict[str, object],
     lookback_days: int = 120,
     sector_heat: dict[str, int] | None = None,
-    history_fetcher: Callable[[str, int, str], pd.DataFrame] = signal_service.fetch_daily_history_akshare,
+    history_fetcher: Callable[[str, int, str], pd.DataFrame] = bar_service.fetch_daily_history_cached,
 ) -> dict[str, object]:
     code = str(row["code"])
     score = 0.0
@@ -146,6 +146,10 @@ def analyze_limit_up_candidate(
 
     if not history.empty:
         latest = history.iloc[-1]
+        if latest.get("数据来源"):
+            payload["data_source"] = latest.get("数据来源")
+        if latest.get("缓存获取时间"):
+            payload["cache_fetched_at"] = latest.get("缓存获取时间")
         close = float(latest["收盘"])
         latest_pct = _clean_float(latest.get("涨跌幅"))
         if row.get("close_price") is None or float(row.get("close_price") or 0) <= 0:
@@ -228,7 +232,7 @@ def scan_limit_up_breakthroughs(
     max_items: int = 100,
     pool_limit: int = 200,
     pool_fetcher: Callable[[str | None], pd.DataFrame] = fetch_limit_up_pool,
-    history_fetcher: Callable[[str, int, str], pd.DataFrame] = signal_service.fetch_daily_history_akshare,
+    history_fetcher: Callable[[str, int, str], pd.DataFrame] = bar_service.fetch_daily_history_cached,
 ) -> tuple[list[dict[str, object]], list[dict[str, str]]]:
     normalized_date = normalize_trade_date(trade_date)
     try:
