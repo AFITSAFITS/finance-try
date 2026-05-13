@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS review_snapshots (
     max_drawdown REAL,
     stop_hit INTEGER,
     target_hit INTEGER,
+    risk_plan_outcome TEXT NOT NULL DEFAULT '',
+    risk_plan_hit_date TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL,
     FOREIGN KEY (signal_event_id) REFERENCES signal_events(id) ON DELETE CASCADE,
     UNIQUE (signal_event_id, horizon)
@@ -188,6 +190,8 @@ MIGRATIONS_SQL = [
     "ALTER TABLE scan_runs ADD COLUMN note TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE review_snapshots ADD COLUMN stop_hit INTEGER",
     "ALTER TABLE review_snapshots ADD COLUMN target_hit INTEGER",
+    "ALTER TABLE review_snapshots ADD COLUMN risk_plan_outcome TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE review_snapshots ADD COLUMN risk_plan_hit_date TEXT NOT NULL DEFAULT ''",
 ]
 
 

@@ -137,28 +137,65 @@ def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
         "stop_distance_pct": stop_distance_pct,
         "stop_hit": None if row.get("stop_hit") is None else bool(row.get("stop_hit")),
         "target_hit": None if row.get("target_hit") is None else bool(row.get("target_hit")),
+        "risk_plan_outcome": row.get("risk_plan_outcome") or "",
+        "risk_plan_hit_date": row.get("risk_plan_hit_date") or "",
         "updated_at": row["updated_at"],
     }
 
 
-def _risk_plan_hits(window: pd.DataFrame, payload: dict[str, Any]) -> tuple[int | None, int | None]:
+def _first_hit_date(window: pd.DataFrame, price_column: str, threshold: float, direction: str) -> str:
+    if price_column not in window.columns or "日期" not in window.columns:
+        return ""
+    if direction == "above":
+        hits = window[window[price_column].astype(float) >= threshold]
+    else:
+        hits = window[window[price_column].astype(float) <= threshold]
+    if hits.empty:
+        return ""
+    return signal_service.format_trade_date(hits.iloc[0]["日期"])
+
+
+def _risk_plan_hits(window: pd.DataFrame, payload: dict[str, Any]) -> tuple[int | None, int | None, str, str]:
     stop_loss_price = payload.get("stop_loss_price")
     target_price = payload.get("target_price")
     stop_hit: int | None = None
     target_hit: int | None = None
+    stop_date = ""
+    target_date = ""
     if stop_loss_price is not None and "最低" in window.columns:
         try:
             stop = float(stop_loss_price)
             stop_hit = int(stop > 0 and float(window["最低"].min()) <= stop)
+            if stop_hit:
+                stop_date = _first_hit_date(window, "最低", stop, "below")
         except (TypeError, ValueError):
             stop_hit = None
     if target_price is not None and "最高" in window.columns:
         try:
             target = float(target_price)
             target_hit = int(target > 0 and float(window["最高"].max()) >= target)
+            if target_hit:
+                target_date = _first_hit_date(window, "最高", target, "above")
         except (TypeError, ValueError):
             target_hit = None
-    return stop_hit, target_hit
+
+    if stop_hit is None and target_hit is None:
+        return stop_hit, target_hit, "无风险计划", ""
+    if stop_hit is None or target_hit is None:
+        return stop_hit, target_hit, "无法判断", stop_date or target_date
+    if not stop_hit and not target_hit:
+        return stop_hit, target_hit, "未触发", ""
+    if stop_hit and not target_hit:
+        return stop_hit, target_hit, "止损先到", stop_date
+    if target_hit and not stop_hit:
+        return stop_hit, target_hit, "目标先到", target_date
+    if stop_date and target_date:
+        if target_date < stop_date:
+            return stop_hit, target_hit, "目标先到", target_date
+        if stop_date < target_date:
+            return stop_hit, target_hit, "止损先到", stop_date
+        return stop_hit, target_hit, "同日触发", stop_date
+    return stop_hit, target_hit, "无法判断", stop_date or target_date
 
 
 def list_review_snapshots(
@@ -187,7 +224,8 @@ def list_review_snapshots(
             SELECT r.id, r.signal_event_id, e.trade_date, e.code, e.indicator, e.event_type, e.summary,
                    e.close_price,
                    r.horizon, r.future_trade_date, r.future_close_price, r.pct_return,
-                   r.max_drawdown, r.stop_hit, r.target_hit, r.updated_at, e.payload_json
+                   r.max_drawdown, r.stop_hit, r.target_hit, r.risk_plan_outcome,
+                   r.risk_plan_hit_date, r.updated_at, e.payload_json
             FROM review_snapshots r
             JOIN signal_events e ON e.id = r.signal_event_id
             {where_sql}
@@ -257,16 +295,17 @@ def backfill_review_snapshots(
                         pct_return = round(((future_close / base_close) - 1.0) * 100.0, 4)
                         max_drawdown = round((((window["收盘"] / base_close) - 1.0).min()) * 100.0, 4)
                         payload = _parse_payload(event)
-                        stop_hit, target_hit = _risk_plan_hits(window, payload)
+                        stop_hit, target_hit, risk_plan_outcome, risk_plan_hit_date = _risk_plan_hits(window, payload)
                         label = horizon_label(horizon_days)
                         now = tdx_service.now_ts()
                         conn.execute(
                             """
                             INSERT INTO review_snapshots (
                                 signal_event_id, horizon, future_trade_date, future_close_price,
-                                pct_return, max_drawdown, stop_hit, target_hit, updated_at
+                                pct_return, max_drawdown, stop_hit, target_hit,
+                                risk_plan_outcome, risk_plan_hit_date, updated_at
                             )
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ON CONFLICT(signal_event_id, horizon)
                             DO UPDATE SET
                                 future_trade_date=excluded.future_trade_date,
@@ -275,6 +314,8 @@ def backfill_review_snapshots(
                                 max_drawdown=excluded.max_drawdown,
                                 stop_hit=excluded.stop_hit,
                                 target_hit=excluded.target_hit,
+                                risk_plan_outcome=excluded.risk_plan_outcome,
+                                risk_plan_hit_date=excluded.risk_plan_hit_date,
                                 updated_at=excluded.updated_at
                             """,
                             (
@@ -286,6 +327,8 @@ def backfill_review_snapshots(
                                 max_drawdown,
                                 stop_hit,
                                 target_hit,
+                                risk_plan_outcome,
+                                risk_plan_hit_date,
                                 now,
                             ),
                         )
@@ -294,7 +337,8 @@ def backfill_review_snapshots(
                             SELECT r.id, r.signal_event_id, e.trade_date, e.code, e.indicator, e.event_type, e.summary,
                                    e.close_price,
                                    r.horizon, r.future_trade_date, r.future_close_price, r.pct_return,
-                                   r.max_drawdown, r.stop_hit, r.target_hit, r.updated_at, e.payload_json
+                                   r.max_drawdown, r.stop_hit, r.target_hit, r.risk_plan_outcome,
+                                   r.risk_plan_hit_date, r.updated_at, e.payload_json
                             FROM review_snapshots r
                             JOIN signal_events e ON e.id = r.signal_event_id
                             WHERE r.signal_event_id = ? AND r.horizon = ?
@@ -335,6 +379,9 @@ def summarize_review_stats(
     df["data_freshness"] = df["data_freshness"].fillna("未知")
     df["risk_bucket"] = df["risk_note"].map(_risk_bucket)
     df["risk_plan_bucket"] = df["stop_distance_pct"].map(_stop_distance_bucket)
+    df["target_first"] = df["risk_plan_outcome"].eq("目标先到")
+    df["stop_first"] = df["risk_plan_outcome"].eq("止损先到")
+    df["same_day_hit"] = df["risk_plan_outcome"].eq("同日触发")
     grouped = (
         df.groupby(
             [
@@ -361,6 +408,9 @@ def summarize_review_stats(
             avg_risk_reward_ratio=("risk_reward_ratio", "mean"),
             stop_hit_rate=("stop_hit", "mean"),
             target_hit_rate=("target_hit", "mean"),
+            target_first_rate=("target_first", "mean"),
+            stop_first_rate=("stop_first", "mean"),
+            same_day_hit_rate=("same_day_hit", "mean"),
         )
         .reset_index()
     )
@@ -408,6 +458,15 @@ def summarize_review_stats(
                 else None,
                 "target_hit_rate": round(float(row["target_hit_rate"]), 4)
                 if not pd.isna(row["target_hit_rate"])
+                else None,
+                "target_first_rate": round(float(row["target_first_rate"]), 4)
+                if not pd.isna(row["target_first_rate"])
+                else None,
+                "stop_first_rate": round(float(row["stop_first_rate"]), 4)
+                if not pd.isna(row["stop_first_rate"])
+                else None,
+                "same_day_hit_rate": round(float(row["same_day_hit_rate"]), 4)
+                if not pd.isna(row["same_day_hit_rate"])
                 else None,
                 "strategy_verdict": decision["strategy_verdict"],
                 "strategy_note": decision["strategy_note"],

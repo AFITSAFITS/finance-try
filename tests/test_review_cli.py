@@ -47,6 +47,9 @@ def test_review_cli_stats_only_skips_signal_backfill(monkeypatch, capsys) -> Non
                 "avg_risk_reward_ratio": 2.0,
                 "stop_hit_rate": 0.25,
                 "target_hit_rate": 0.5,
+                "stop_first_rate": 0.25,
+                "target_first_rate": 0.5,
+                "same_day_hit_rate": 0.0,
                 "strategy_verdict": "样本不足",
                 "strategy_note": "继续积累样本",
             }
@@ -66,6 +69,9 @@ def test_review_cli_stats_only_skips_signal_backfill(monkeypatch, capsys) -> Non
     assert "avg_stop_distance_pct=8.7" in captured.out
     assert "stop_hit_rate=0.25" in captured.out
     assert "target_hit_rate=0.5" in captured.out
+    assert "stop_first_rate=0.25" in captured.out
+    assert "target_first_rate=0.5" in captured.out
+    assert "same_day_hit_rate=0.0" in captured.out
 
 
 def test_review_cli_stats_only_skips_limit_up_backfill(monkeypatch, capsys) -> None:

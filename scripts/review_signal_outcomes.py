@@ -97,6 +97,8 @@ def main() -> int:
                 f"avg_volume_ratio={item['avg_volume_ratio']} | risk_plan={item['risk_plan_bucket']} | "
                 f"avg_stop_distance_pct={item['avg_stop_distance_pct']} | avg_risk_reward_ratio={item['avg_risk_reward_ratio']} | "
                 f"stop_hit_rate={item['stop_hit_rate']} | target_hit_rate={item['target_hit_rate']} | "
+                f"stop_first_rate={item['stop_first_rate']} | target_first_rate={item['target_first_rate']} | "
+                f"same_day_hit_rate={item['same_day_hit_rate']} | "
                 f"verdict={item['strategy_verdict']} | "
                 f"note={item['strategy_note']}"
             )
