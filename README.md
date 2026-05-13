@@ -484,7 +484,7 @@ docker compose up --build -d
 python scripts/deployment_smoke.py --require-watchlist
 ```
 
-这会检查 API 健康状态、默认股票池、策略结论接口和页面是否能访问。临时需要跳过策略结论接口检查时，可以加 `--skip-strategy-check`。
+这会检查 API 健康状态、默认股票池、策略结论接口和页面是否能访问。临时需要跳过策略结论接口检查时，可以加 `--skip-strategy-check`。Docker Compose 里的 API 容器健康检查也会同时检查 `/health` 和策略结论接口。
 
 ### 停止
 
