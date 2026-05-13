@@ -66,6 +66,17 @@ def main() -> int:
         print(result["watchlist_message"])
     if result.get("watchlist_warning"):
         print(f"WARNING [watchlist]: {result['watchlist_warning']}", file=sys.stderr)
+    summary = result.get("signal_summary", {})
+    if summary:
+        print(
+            "signal_summary "
+            f"signals={summary.get('signals', 0)} "
+            f"errors={summary.get('error_count', 0)} "
+            f"max_score={summary.get('max_score', '-')} "
+            f"stale_signals={summary.get('stale_signals', 0)} "
+            f"observations={summary.get('observation_counts', {})} "
+            f"freshness={summary.get('freshness_counts', {})}"
+        )
 
     new_events = select_newly_delivered_events(
         result.get("notification_events", result["persisted_events"]),

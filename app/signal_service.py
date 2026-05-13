@@ -527,6 +527,45 @@ def apply_relative_strength(
         row["风险提示"] = "；".join(dict.fromkeys(risks)) if risks else "无明显风险"
 
 
+def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]] | None = None) -> dict[str, object]:
+    if signal_rows.empty:
+        return {
+            "signals": 0,
+            "error_count": len(errors or []),
+            "max_score": None,
+            "observation_counts": {},
+            "freshness_counts": {},
+            "direction_counts": {},
+            "stale_signals": 0,
+        }
+
+    def value_counts(column: str) -> dict[str, int]:
+        if column not in signal_rows.columns:
+            return {}
+        counts = signal_rows[column].fillna("未标记").astype(str).value_counts()
+        return {str(key): int(value) for key, value in counts.items()}
+
+    freshness_counts = value_counts("数据时效")
+    stale_signals = int(
+        sum(freshness_counts.get(label, 0) for label in ("数据可能滞后", "数据明显滞后"))
+    )
+    max_score = None
+    if "信号评分" in signal_rows.columns:
+        scores = pd.to_numeric(signal_rows["信号评分"], errors="coerce").dropna()
+        if not scores.empty:
+            max_score = round(float(scores.max()), 2)
+
+    return {
+        "signals": int(len(signal_rows.index)),
+        "error_count": len(errors or []),
+        "max_score": max_score,
+        "observation_counts": value_counts("观察结论"),
+        "freshness_counts": freshness_counts,
+        "direction_counts": value_counts("信号方向"),
+        "stale_signals": stale_signals,
+    }
+
+
 def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, object] | None:
     normalized = normalize_history_df(history_df, code)
     if len(normalized.index) < 2:

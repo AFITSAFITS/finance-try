@@ -205,6 +205,25 @@ def print_df(df: pd.DataFrame, output: str | None) -> None:
         print(f"\n已写出: {output}")
 
 
+def format_counts(counts: dict[str, int]) -> str:
+    if not counts:
+        return "-"
+    return ",".join(f"{key}:{value}" for key, value in counts.items())
+
+
+def print_signal_summary(summary: dict[str, object]) -> None:
+    print(
+        "signal_summary "
+        f"signals={summary.get('signals', 0)} "
+        f"errors={summary.get('error_count', 0)} "
+        f"max_score={summary.get('max_score', '-')} "
+        f"stale_signals={summary.get('stale_signals', 0)} "
+        f"observations={format_counts(summary.get('observation_counts', {}))} "
+        f"freshness={format_counts(summary.get('freshness_counts', {}))} "
+        f"directions={format_counts(summary.get('direction_counts', {}))}"
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fetch stock data.")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -391,6 +410,7 @@ def main() -> int:
                     f"WARNING [{error.get('股票代码', '')}]: {error.get('error', '')}",
                     file=sys.stderr,
                 )
+            print_signal_summary(signal_service.summarize_signal_rows(df, errors))
             cols = [
                 "股票代码",
                 "日期",

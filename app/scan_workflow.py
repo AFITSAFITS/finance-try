@@ -72,11 +72,13 @@ def run_default_watchlist_scan(
         notification_events,
         channel=channel,
     )
+    signal_summary = signal_service.summarize_signal_rows(signal_rows, errors)
     return {
         "watchlist": watchlist,
         "requested_count": len(codes),
         "elapsed_seconds": round(time.perf_counter() - started_at, 3),
         "min_score": min_score,
+        "signal_summary": signal_summary,
         "persisted_events": persisted_events,
         "notification_events": notification_events,
         "delivery_results": delivery_results,

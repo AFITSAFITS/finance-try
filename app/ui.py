@@ -301,6 +301,13 @@ def main() -> None:
             m2.metric("命中信号数", len(items))
             m3.metric("错误数", data.get("error_count", len(errors)))
             m4.metric("耗时(秒)", data.get("elapsed_seconds", ""))
+            summary = data.get("signal_summary", {}) if isinstance(data.get("signal_summary"), dict) else {}
+            if summary:
+                st.caption(
+                    f"观察结论={summary.get('observation_counts', {})} | "
+                    f"数据时效={summary.get('freshness_counts', {})} | "
+                    f"最高评分={summary.get('max_score', '-')}"
+                )
             for error in errors:
                 st.warning(f"{error.get('股票代码', '')}: {error.get('error', '')}")
             if errors and not items and data.get("error_count", 0) == data.get("requested_count", 0):
@@ -656,6 +663,13 @@ def main() -> None:
             m3.metric("错误数", data.get("error_count", len(data.get("errors", []))))
             m4.metric("耗时(秒)", data.get("elapsed_seconds", ""))
             st.caption(f"本次代表通知数={data.get('notification_count', len(data.get('deliveries', [])))}")
+            summary = data.get("signal_summary", {}) if isinstance(data.get("signal_summary"), dict) else {}
+            if summary:
+                st.caption(
+                    f"观察结论={summary.get('observation_counts', {})} | "
+                    f"数据时效={summary.get('freshness_counts', {})} | "
+                    f"最高评分={summary.get('max_score', '-')}"
+                )
             for message in data.get("messages", []):
                 st.info(message)
             for error in data.get("errors", []):

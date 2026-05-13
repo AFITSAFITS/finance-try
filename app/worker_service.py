@@ -77,6 +77,7 @@ def run_worker_loop(
                 min_score=float(min_score),
             )
             last_run_date = now.strftime("%Y-%m-%d")
+            summary = result.get("signal_summary", {})
             print(
                 f"[worker] trade_date={last_run_date} "
                 f"watchlist={result['watchlist'].get('name', '')} "
@@ -84,6 +85,7 @@ def run_worker_loop(
                 f"events={len(result.get('persisted_events', []))} "
                 f"notification_events={len(result.get('notification_events', []))} "
                 f"min_score={result.get('min_score', '')} "
+                f"stale_signals={summary.get('stale_signals', 0) if isinstance(summary, dict) else 0} "
                 f"errors={len(result.get('errors', []))}"
             )
         time.sleep(max(1, int(poll_seconds)))

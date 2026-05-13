@@ -33,6 +33,14 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
                 {"channel": "stdout", "status": "delivered", "created": True},
                 {"channel": "stdout", "status": "delivered", "created": True},
             ],
+            "signal_summary": {
+                "signals": 2,
+                "error_count": 1,
+                "max_score": 85,
+                "stale_signals": 0,
+                "observation_counts": {"重点观察": 1, "谨慎观察": 1},
+                "freshness_counts": {"最近交易日": 2},
+            },
             "errors": [{"股票代码": "000001", "error": "network timeout"}],
         }
 
@@ -49,6 +57,8 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
     assert result == 0
     assert called["min_score"] == 70.0
     assert "min_score=70.0" in captured.out
+    assert "signal_summary" in captured.out
+    assert "stale_signals=0" in captured.out
     assert "默认股票池" in captured.out
     assert "MACD金叉" in captured.out
     assert "WARNING [000001]: network timeout" in captured.err

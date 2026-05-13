@@ -257,6 +257,8 @@ def test_daily_signals_success(monkeypatch) -> None:
                         "信号评分": 95,
                         "信号方向": "偏多",
                         "信号级别": "重点观察",
+                        "观察结论": "重点观察",
+                        "数据时效": "最近交易日",
                         "MACD信号": "MACD金叉",
                         "MACD形态": "水下金叉后水上再次金叉",
                         "均线信号": "MA5上穿MA20",
@@ -289,6 +291,8 @@ def test_daily_signals_success(monkeypatch) -> None:
     assert "elapsed_seconds" in body
     assert body["items"][0]["股票代码"] == "600592"
     assert body["items"][0]["信号评分"] == 95
+    assert body["signal_summary"]["observation_counts"] == {"重点观察": 1}
+    assert body["signal_summary"]["freshness_counts"] == {"最近交易日": 1}
     assert body["errors"][0]["股票代码"] == "600487"
 
 
@@ -419,6 +423,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
             "requested_count": 2,
             "elapsed_seconds": 12.5,
             "min_score": kwargs["min_score"],
+            "signal_summary": {"signals": 1, "observation_counts": {"重点观察": 1}},
         }
 
     monkeypatch.setattr(api_module.scan_workflow, "run_default_watchlist_scan", fake_run_default_watchlist_scan)
@@ -434,6 +439,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
     assert body["error_count"] == 1
     assert body["elapsed_seconds"] == 12.5
     assert body["min_score"] == 70.0
+    assert body["signal_summary"]["signals"] == 1
     assert body["deliveries"][0]["channel"] == "stdout"
     assert body["errors"][0]["股票代码"] == "000001"
 

@@ -51,7 +51,17 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch) -> N
     def fake_scan_stock_signal_events(**kwargs):
         assert kwargs["codes"] == ["600519"]
         assert kwargs["min_score"] == 60.0
-        return pd.DataFrame(), []
+        return pd.DataFrame(
+            [
+                {
+                    "股票代码": "600519",
+                    "观察结论": "重点观察",
+                    "数据时效": "最近交易日",
+                    "信号方向": "偏多",
+                    "信号评分": 85,
+                }
+            ]
+        ), []
 
     monkeypatch.setattr(scan_workflow.watchlist_service, "ensure_default_watchlist", fake_ensure_default_watchlist)
     monkeypatch.setattr(scan_workflow.signal_service, "scan_stock_signal_events", fake_scan_stock_signal_events)
@@ -87,6 +97,8 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch) -> N
     assert result["requested_count"] == 1
     assert result["min_score"] == 60.0
     assert [item["id"] for item in result["persisted_events"]] == [1, 2]
+    assert result["signal_summary"]["observation_counts"] == {"重点观察": 1}
+    assert result["signal_summary"]["freshness_counts"] == {"最近交易日": 1}
     assert [item["id"] for item in result["notification_events"]] == [2]
     assert delivered["ids"] == [2]
     assert result["watchlist_source"] == "seed"
