@@ -71,6 +71,8 @@ def test_summarize_strategy_decisions_combines_and_prioritizes(monkeypatch) -> N
     assert result["actionable_only"] is False
     assert result["verdict_counts"] == {"保留": 1, "样本不足": 1, "降权": 1}
     assert result["confidence_counts"] == {"中": 2, "低": 1}
+    assert result["strategy_type_counts"] == {"日线信号": 2, "涨停策略": 1}
+    assert result["data_source_counts"] == {"本地缓存": 2, "旧缓存兜底": 1}
     assert [item["strategy_verdict"] for item in result["items"]] == ["保留", "降权", "样本不足"]
     assert result["items"][0]["strategy_type"] == "日线信号"
     assert result["items"][0]["strategy_name"] == "60-80 / 偏多 / 谨慎观察 / MACD金叉"
@@ -165,4 +167,6 @@ def test_summarize_strategy_decisions_filters_samples_and_actionable(monkeypatch
     assert result["min_samples"] == 5
     assert result["actionable_only"] is True
     assert result["data_source"] == "本地缓存"
+    assert result["strategy_type_counts"] == {"日线信号": 1}
+    assert result["data_source_counts"] == {"本地缓存": 1}
     assert [item["strategy_name"] for item in result["items"]] == ["60-80 / 偏多 / 正常观察 / 信号A"]

@@ -126,6 +126,8 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
             "data_source": "本地缓存",
             "verdict_counts": {"保留": 1},
             "confidence_counts": {"中": 1},
+            "strategy_type_counts": {"日线信号": 1},
+            "data_source_counts": {"本地缓存": 1},
             "items": [
                 {
                     "strategy_type": "日线信号",
@@ -172,5 +174,7 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     assert "min_samples=5" in captured.out
     assert "actionable_only=True" in captured.out
     assert "data_source=本地缓存" in captured.out
+    assert "types={'日线信号': 1}" in captured.out
+    assert "sources={'本地缓存': 1}" in captured.out
     assert "type=日线信号" in captured.out
     assert "verdict=保留" in captured.out

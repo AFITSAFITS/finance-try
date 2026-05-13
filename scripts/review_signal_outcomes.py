@@ -160,7 +160,8 @@ def main() -> int:
             f"filtered={strategy_summary['filtered_count']} | actionable={strategy_summary['actionable_count']} | "
             f"min_samples={strategy_summary['min_samples']} | actionable_only={strategy_summary['actionable_only']} | "
             f"data_source={strategy_summary['data_source']} | "
-            f"verdicts={strategy_summary['verdict_counts']} | confidence={strategy_summary['confidence_counts']}"
+            f"verdicts={strategy_summary['verdict_counts']} | confidence={strategy_summary['confidence_counts']} | "
+            f"types={strategy_summary['strategy_type_counts']} | sources={strategy_summary['data_source_counts']}"
         )
         items = strategy_summary.get("items", [])
         if not items:

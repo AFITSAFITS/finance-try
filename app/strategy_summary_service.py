@@ -146,5 +146,7 @@ def summarize_strategy_decisions(
         "data_source": data_source_filter,
         "verdict_counts": _count_by(items, "strategy_verdict"),
         "confidence_counts": _count_by(items, "strategy_confidence"),
+        "strategy_type_counts": _count_by(items, "strategy_type"),
+        "data_source_counts": _count_by(items, "data_source"),
         "items": limited,
     }
