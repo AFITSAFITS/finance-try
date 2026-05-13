@@ -24,6 +24,7 @@ def format_event_message(event: dict[str, Any]) -> str:
     payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
     signal_score = _clean_display(payload.get("signal_score"))
     observation_conclusion = _clean_display(payload.get("observation_conclusion"))
+    data_freshness = _clean_display(payload.get("data_freshness"))
     risk_note = _clean_display(payload.get("risk_note"))
     position_60d = _format_number(payload.get("position_60d"))
     volume_ratio = _format_number(payload.get("volume_ratio"))
@@ -34,6 +35,7 @@ def format_event_message(event: dict[str, Any]) -> str:
     return (
         f"[{trade_date}] {code} {summary} | severity={severity} | "
         f"close={close_price} | pct_change={pct_change} | score={signal_score} | conclusion={observation_conclusion} | "
+        f"data_freshness={data_freshness} | "
         f"position_60d={position_60d} | volume_ratio={volume_ratio} | "
         f"relative_strength={relative_strength} | candlestick={candlestick_pattern} | "
         f"stop_loss={stop_loss_price} | target={target_price} | risk={risk_note}"
@@ -87,6 +89,8 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
     signal_score = _format_number(payload.get("signal_score"))
     signal_level = _clean_display(payload.get("signal_level"))
     observation_conclusion = _clean_display(payload.get("observation_conclusion"))
+    data_freshness = _clean_display(payload.get("data_freshness"))
+    data_lag_days = _format_number(payload.get("data_lag_days"))
     risk_note = _clean_display(payload.get("risk_note"))
     position_60d = _format_number(payload.get("position_60d"))
     volume_ratio = _format_number(payload.get("volume_ratio"))
@@ -128,6 +132,8 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**评分**\n{signal_score}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**级别**\n{signal_level}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**观察结论**\n{observation_conclusion}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**数据时效**\n{data_freshness}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**滞后天数**\n{data_lag_days}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**60日位置**\n{position_60d}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**量能比**\n{volume_ratio}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**相对强度**\n{relative_strength}"}},

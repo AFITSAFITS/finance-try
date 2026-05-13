@@ -45,6 +45,8 @@ def seed_events() -> pd.DataFrame:
                 "信号方向": "偏多",
                 "信号级别": "观察",
                 "观察结论": "谨慎观察",
+                "数据时效": "最近交易日",
+                "数据滞后天数": 1,
                 "评分原因": "金叉叠加均线转强",
                 "风险提示": "接近60日高位",
                 "60日位置": 0.92,
@@ -84,6 +86,8 @@ def test_backfill_review_snapshots_and_stats(monkeypatch, tmp_path) -> None:
     assert t3_rows[0]["signal_score"] == 75.0
     assert t3_rows[0]["signal_direction"] == "偏多"
     assert t3_rows[0]["observation_conclusion"] == "谨慎观察"
+    assert t3_rows[0]["data_freshness"] == "最近交易日"
+    assert t3_rows[0]["data_lag_days"] == 1.0
     assert t3_rows[0]["risk_note"] == "接近60日高位"
     assert t3_rows[0]["position_60d"] == 0.92
     assert t3_rows[0]["volume_ratio"] == 1.35
@@ -97,6 +101,7 @@ def test_backfill_review_snapshots_and_stats(monkeypatch, tmp_path) -> None:
     assert macd_stats["score_bucket"] == "60-80"
     assert macd_stats["signal_direction"] == "偏多"
     assert macd_stats["observation_conclusion"] == "谨慎观察"
+    assert macd_stats["data_freshness"] == "最近交易日"
     assert macd_stats["risk_bucket"] == "有风险提示"
     assert macd_stats["risk_plan_bucket"] == "5-8%"
     assert macd_stats["sample_count"] == 1

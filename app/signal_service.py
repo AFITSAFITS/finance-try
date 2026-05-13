@@ -26,6 +26,8 @@ DEFAULT_PROVIDER_TIMEOUT_SECONDS = 12.0
 SIGNAL_OUTPUT_COLUMNS = [
     "股票代码",
     "日期",
+    "数据时效",
+    "数据滞后天数",
     "收盘",
     "涨跌幅",
     "信号评分",
@@ -254,6 +256,25 @@ def extract_bullish_trade_plan(enriched_df: pd.DataFrame, row: dict[str, object]
     }
 
 
+def extract_data_freshness(trade_date: object, now: datetime | None = None) -> dict[str, object]:
+    parsed = pd.to_datetime(trade_date, errors="coerce")
+    if pd.isna(parsed):
+        return {"数据时效": "未知", "数据滞后天数": None}
+
+    current_date = (now or datetime.now()).date()
+    data_date = parsed.date()
+    lag_days = max(0, (current_date - data_date).days)
+    if lag_days == 0:
+        status = "当日数据"
+    elif lag_days <= 3:
+        status = "最近交易日"
+    elif lag_days <= 7:
+        status = "数据可能滞后"
+    else:
+        status = "数据明显滞后"
+    return {"数据时效": status, "数据滞后天数": lag_days}
+
+
 def apply_trade_plan_risk(row: dict[str, object]) -> None:
     if row.get("信号方向") != "偏多":
         return
@@ -318,6 +339,7 @@ def score_signal_row(row: dict[str, object]) -> dict[str, object]:
     position_60d = row.get("60日位置")
     volume_ratio = row.get("量能比")
     candlestick_pattern = str(row.get("K线形态") or "")
+    freshness = str(row.get("数据时效") or "")
 
     if macd_signal == "MACD金叉":
         score += 20
@@ -394,6 +416,13 @@ def score_signal_row(row: dict[str, object]) -> dict[str, object]:
         elif candlestick_pattern == "弱势收盘":
             score -= 10
             risks.append("收盘偏弱")
+
+    if freshness == "数据可能滞后":
+        score -= 5
+        risks.append("数据可能滞后")
+    elif freshness == "数据明显滞后":
+        score -= 10
+        risks.append("数据明显滞后")
 
     bounded_score = max(0.0, min(100.0, score))
     if bounded_score >= 80:
@@ -530,6 +559,7 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
     row = {
         "股票代码": code,
         "日期": format_trade_date(curr_row["日期"]),
+        **extract_data_freshness(curr_row["日期"]),
         "收盘": round(float(curr_row["收盘"]), 4),
         "涨跌幅": None if pd.isna(curr_row["涨跌幅"]) else round(float(curr_row["涨跌幅"]), 4),
         "DIF": round(float(curr_row["DIF"]), 6),

@@ -14,6 +14,8 @@ def test_persist_signal_rows_dedupes_events(monkeypatch, tmp_path) -> None:
                 "日期": "2026-04-08",
                 "收盘": 1530.25,
                 "涨跌幅": 1.82,
+                "数据时效": "最近交易日",
+                "数据滞后天数": 1,
                 "DIF": 1.2034,
                 "DEA": 1.1028,
                 "MACD信号": "MACD金叉",
@@ -44,6 +46,8 @@ def test_persist_signal_rows_dedupes_events(monkeypatch, tmp_path) -> None:
     }
     assert all(item["severity"] == "high" for item in history)
     assert history[0]["payload"]["close"] == 1530.25
+    assert history[0]["payload"]["data_freshness"] == "最近交易日"
+    assert history[0]["payload"]["data_lag_days"] == 1.0
     assert history[0]["payload"]["signal_score"] == 88.0
     assert history[0]["payload"]["signal_direction"] == "偏多"
 

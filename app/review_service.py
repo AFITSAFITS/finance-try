@@ -125,6 +125,8 @@ def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
         "signal_direction": payload.get("signal_direction"),
         "signal_level": payload.get("signal_level"),
         "observation_conclusion": payload.get("observation_conclusion"),
+        "data_freshness": payload.get("data_freshness"),
+        "data_lag_days": payload.get("data_lag_days"),
         "score_reason": payload.get("score_reason"),
         "risk_note": payload.get("risk_note"),
         "position_60d": payload.get("position_60d"),
@@ -302,6 +304,7 @@ def summarize_review_stats(
     df["score_bucket"] = df["signal_score"].map(_score_bucket)
     df["signal_direction"] = df["signal_direction"].fillna("未知")
     df["observation_conclusion"] = df["observation_conclusion"].fillna("未标记")
+    df["data_freshness"] = df["data_freshness"].fillna("未知")
     df["risk_bucket"] = df["risk_note"].map(_risk_bucket)
     df["risk_plan_bucket"] = df["stop_distance_pct"].map(_stop_distance_bucket)
     grouped = (
@@ -310,6 +313,7 @@ def summarize_review_stats(
                 "score_bucket",
                 "signal_direction",
                 "observation_conclusion",
+                "data_freshness",
                 "risk_bucket",
                 "risk_plan_bucket",
                 "summary",
@@ -347,6 +351,7 @@ def summarize_review_stats(
                 "score_bucket": row["score_bucket"],
                 "signal_direction": row["signal_direction"],
                 "observation_conclusion": row["observation_conclusion"],
+                "data_freshness": row["data_freshness"],
                 "risk_bucket": row["risk_bucket"],
                 "risk_plan_bucket": row["risk_plan_bucket"],
                 "summary": row["summary"],
@@ -378,6 +383,7 @@ def summarize_review_stats(
             item["score_bucket"],
             item["signal_direction"],
             item["observation_conclusion"],
+            item["data_freshness"],
             item["risk_bucket"],
             item["risk_plan_bucket"],
             -item["sample_count"],

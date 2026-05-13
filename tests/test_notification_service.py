@@ -57,6 +57,7 @@ def test_build_stdout_messages_formats_events() -> None:
                 "payload": {
                     "signal_score": 75,
                     "observation_conclusion": "谨慎观察",
+                    "data_freshness": "最近交易日",
                     "position_60d": 0.42,
                     "volume_ratio": 1.6,
                     "stop_loss_price": 1450.0,
@@ -72,6 +73,7 @@ def test_build_stdout_messages_formats_events() -> None:
     assert "MACD金叉" in messages[0]
     assert "score=75" in messages[0]
     assert "conclusion=谨慎观察" in messages[0]
+    assert "data_freshness=最近交易日" in messages[0]
     assert "position_60d=0.42" in messages[0]
     assert "stop_loss=1450.00" in messages[0]
     assert "target=1690.00" in messages[0]
@@ -107,6 +109,8 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
                 "signal_score": 88,
                 "signal_level": "重点观察",
                 "observation_conclusion": "重点观察",
+                "data_freshness": "当日数据",
+                "data_lag_days": 0,
                 "position_60d": 0.35,
                 "volume_ratio": 1.8,
                 "stop_loss_price": 1450.0,
@@ -127,6 +131,8 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
     assert "**评分**\n88.00" in field_text
     assert "**级别**\n重点观察" in field_text
     assert "**观察结论**\n重点观察" in field_text
+    assert "**数据时效**\n当日数据" in field_text
+    assert "**滞后天数**\n0.00" in field_text
     assert "**60日位置**\n0.35" in field_text
     assert "**量能比**\n1.80" in field_text
     assert "**参考止损**\n1450.00" in field_text

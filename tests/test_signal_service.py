@@ -9,9 +9,10 @@ from app import signal_service
 
 
 def make_history(code: str, closes: list[float]) -> pd.DataFrame:
+    dates = pd.date_range(end=pd.Timestamp.today().normalize(), periods=len(closes), freq="D")
     return pd.DataFrame(
         {
-            "日期": pd.date_range("2026-03-01", periods=len(closes), freq="D"),
+            "日期": dates,
             "股票代码": [code] * len(closes),
             "开盘": closes,
             "收盘": closes,
@@ -101,6 +102,22 @@ def test_score_signal_row_accounts_for_position_and_volume() -> None:
     assert "量能放大" in strong_row["评分原因"]
     assert "接近60日高位" in high_weak_row["风险提示"]
     assert "量能不足" in high_weak_row["风险提示"]
+
+
+def test_data_freshness_marks_stale_signal_risk() -> None:
+    recent = signal_service.extract_data_freshness("2026-05-12", now=pd.Timestamp("2026-05-13").to_pydatetime())
+    stale = signal_service.score_signal_row(
+        {
+            "MACD信号": "MACD金叉",
+            "均线信号": "MA5上穿MA20",
+            "涨跌幅": 2.0,
+            "数据时效": "数据明显滞后",
+        }
+    )
+
+    assert recent == {"数据时效": "最近交易日", "数据滞后天数": 1}
+    assert "数据明显滞后" in stale["风险提示"]
+    assert stale["信号评分"] < 90
 
 
 def test_extract_candlestick_profile_detects_strong_and_upper_shadow() -> None:
@@ -388,6 +405,8 @@ def test_scan_stock_signal_events_outputs_trade_plan() -> None:
 
     assert errors == []
     row = df.iloc[0]
+    assert row["数据时效"] in {"当日数据", "最近交易日", "数据可能滞后", "数据明显滞后"}
+    assert row["数据滞后天数"] >= 0
     assert row["参考止损"] < row["收盘"]
     assert row["参考目标"] > row["收盘"]
     assert row["风险收益比"] == 2.0
