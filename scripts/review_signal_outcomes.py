@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -45,6 +46,11 @@ def parse_args() -> argparse.Namespace:
         "--strategy-actionable-only",
         action="store_true",
         help="Only print unified strategy rows that are actionable",
+    )
+    parser.add_argument(
+        "--strategy-json",
+        action="store_true",
+        help="Print machine-readable JSON for the unified strategy summary",
     )
     return parser.parse_args()
 
@@ -92,7 +98,7 @@ def main() -> int:
                 code=args.code.strip() or None,
             )
 
-        if args.strategy_summary:
+        if args.strategy_summary or args.strategy_json:
             strategy_summary = strategy_summary_service.summarize_strategy_decisions(
                 horizon=args.summary_horizon.strip() or "T+3",
                 trade_date=args.trade_date.strip() or None,
@@ -105,6 +111,19 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+
+    if args.strategy_json:
+        print(
+            json.dumps(
+                {
+                    "review_snapshots": signal_result["count"],
+                    "limit_up_review_snapshots": limit_result["count"],
+                    "strategy_summary": strategy_summary,
+                },
+                ensure_ascii=False,
+            )
+        )
+        return 0
 
     print(f"review_snapshots={signal_result['count']}")
     for error in signal_result["errors"]:

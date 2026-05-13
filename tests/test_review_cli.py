@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -180,3 +181,41 @@ def test_review_cli_prints_strategy_summary(monkeypatch, capsys) -> None:
     assert "type=日线信号" in captured.out
     assert "next_action=保留该分组" in captured.out
     assert "verdict=保留" in captured.out
+
+
+def test_review_cli_prints_strategy_summary_json(monkeypatch, capsys) -> None:
+    module = load_module()
+
+    monkeypatch.setattr(module.review_service, "summarize_review_stats", lambda **kwargs: [])
+    monkeypatch.setattr(module.limit_up_service, "summarize_limit_up_review_stats", lambda **kwargs: [])
+    monkeypatch.setattr(
+        module.strategy_summary_service,
+        "summarize_strategy_decisions",
+        lambda **kwargs: {
+            "horizon": kwargs["horizon"],
+            "total_count": 1,
+            "filtered_count": 1,
+            "actionable_count": 1,
+            "min_samples": kwargs["min_samples"],
+            "actionable_only": kwargs["actionable_only"],
+            "data_source": kwargs["data_source"] or "",
+            "verdict_counts": {"保留": 1},
+            "confidence_counts": {"中": 1},
+            "strategy_type_counts": {"日线信号": 1},
+            "data_source_counts": {"本地缓存": 1},
+            "items": [{"strategy_type": "日线信号", "strategy_next_action": "保留该分组"}],
+        },
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [str(REVIEW_SCRIPT), "--stats-only", "--strategy-json", "--strategy-data-source", "本地缓存"],
+    )
+
+    assert module.main() == 0
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["review_snapshots"] == "skipped"
+    assert payload["limit_up_review_snapshots"] == "skipped"
+    assert payload["strategy_summary"]["data_source"] == "本地缓存"
+    assert payload["strategy_summary"]["items"][0]["strategy_next_action"] == "保留该分组"
