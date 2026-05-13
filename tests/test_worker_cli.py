@@ -90,5 +90,7 @@ def test_run_scan_worker_cli_run_once_with_review(monkeypatch, capsys) -> None:
     assert called["review_after_scan"] is True
     assert called["review_trade_date"] == "2026-05-01"
     assert called["review_horizons"] == [1, 3]
+    assert called["review_due_only"] is True
     assert "review_snapshots=2" in captured.out
+    assert "review_due_only=True" in captured.out
     assert "review_stats=1" in captured.out

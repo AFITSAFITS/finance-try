@@ -147,9 +147,10 @@ def test_run_daily_scan_cli_can_review_after_scan(monkeypatch, capsys) -> None:
     assert scan_called["min_score"] == 60.0
     assert review_called["backfill"]["trade_date"] == "2026-05-01"
     assert review_called["backfill"]["horizons"] == [1, 3]
+    assert review_called["backfill"]["due_only"] is True
     assert review_called["stats"]["horizon"] == "T+3"
     assert "review_snapshots=2" in captured.out
-    assert "scan_run_review enabled=True snapshots=2 stats=1 error=" in captured.out
+    assert "scan_run_review enabled=True due_only=True snapshots=2 stats=1 error=" in captured.out
     assert "review_summary" in captured.out
     assert "confidence=中" in captured.out
     assert "actionable=True" in captured.out

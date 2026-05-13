@@ -57,6 +57,12 @@ def parse_args() -> argparse.Namespace:
         help="Summary horizon label after review backfill",
     )
     parser.add_argument(
+        "--review-due-only",
+        action=argparse.BooleanOptionalAction,
+        default=env_flag("AI_FINANCE_REVIEW_DUE_ONLY", True),
+        help="Only backfill matured review snapshots after worker scans",
+    )
+    parser.add_argument(
         "--schedule-time",
         type=str,
         default=os.getenv("AI_FINANCE_WORKER_SCHEDULE_TIME", "15:05"),
@@ -91,6 +97,7 @@ def main() -> int:
                 review_trade_date=args.review_trade_date,
                 review_horizons=parse_horizon_args(args.review_horizons),
                 review_summary_horizon=args.review_summary_horizon,
+                review_due_only=bool(args.review_due_only),
             )
             print(
                 f"watchlist={result['watchlist'].get('name', '')} "
@@ -105,6 +112,7 @@ def main() -> int:
                 review_stats = result.get("review_stats") or []
                 print(
                     f"review_snapshots={review_result.get('count', 0)} "
+                    f"review_due_only={bool(args.review_due_only)} "
                     f"review_stats={len(review_stats)} "
                     f"review_error={result.get('review_error', '')}"
                 )
@@ -120,6 +128,7 @@ def main() -> int:
             review_trade_date=args.review_trade_date,
             review_horizons=parse_horizon_args(args.review_horizons),
             review_summary_horizon=args.review_summary_horizon,
+            review_due_only=bool(args.review_due_only),
             schedule_time=args.schedule_time,
             timezone_name=args.timezone,
             poll_seconds=int(args.poll_seconds),

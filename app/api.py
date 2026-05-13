@@ -85,6 +85,7 @@ class RunDailyJobRequest(BaseModel):
     review_trade_date: str = ""
     review_horizons: list[int] = Field(default_factory=lambda: [1, 3, 5])
     review_summary_horizon: str = "T+3"
+    review_due_only: bool = True
 
 
 class BackfillReviewsRequest(BaseModel):
@@ -448,6 +449,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
                     trade_date=req.review_trade_date.strip() or None,
                     horizons=review_service.parse_horizons(req.review_horizons),
                     adjust=req.adjust.strip(),
+                    due_only=bool(req.review_due_only),
                 )
                 review_stats = review_service.summarize_review_stats(
                     horizon=req.review_summary_horizon.strip() or "T+3",
@@ -491,6 +493,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             "deliveries": result["delivery_results"],
             "errors": result["errors"],
             "review_after_scan": req.review_after_scan,
+            "review_due_only": req.review_due_only,
             "review_result": review_result or {},
             "review_stats": review_stats,
             "review_error": review_error,

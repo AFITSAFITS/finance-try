@@ -491,6 +491,7 @@ def test_run_daily_job_can_review_after_scan(monkeypatch, tmp_path) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["review_after_scan"] is True
+    assert body["review_due_only"] is True
     assert body["review_result"]["count"] == 2
     assert body["review_stats"][0]["strategy_confidence"] == "中"
     assert body["review_error"] == ""
@@ -500,6 +501,7 @@ def test_run_daily_job_can_review_after_scan(monkeypatch, tmp_path) -> None:
     assert body["scan_run"]["review_error"] == ""
     assert review_called["backfill"]["trade_date"] == "2026-05-01"
     assert review_called["backfill"]["horizons"] == [1, 3]
+    assert review_called["backfill"]["due_only"] is True
     assert review_called["stats"]["horizon"] == "T+3"
 
 

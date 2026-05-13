@@ -513,7 +513,6 @@ def main() -> None:
 
     with quote_tab:
         render_section_header("实时行情", "快速查看当前价格、涨跌和盘中观察提示；优先使用东方财富，失败时自动尝试腾讯。")
-        codes_text = st.text_area("股票代码（每行一个）", value=DEFAULT_CODES, height=160, key="quote_codes")
         c1, c2, c3 = st.columns(3)
         if c1.button("从默认股票池载入", key="quote_load_default_watchlist"):
             try:
@@ -528,6 +527,7 @@ def main() -> None:
                 st.stop()
             st.session_state["quote_codes"] = "\n".join(str(item.get("code", "")) for item in watchlist.get("items", []))
             st.rerun()
+        codes_text = st.text_area("股票代码（每行一个）", value=DEFAULT_CODES, height=160, key="quote_codes")
 
         quote_data = None
         if c2.button("查询实时行情", type="primary"):
@@ -594,7 +594,6 @@ def main() -> None:
 
     with signal_tab:
         render_section_header("临时信号", "临时输入股票做日线信号扫描；要沉淀进复盘事件库，请使用“每日任务”。")
-        codes_text = st.text_area("股票代码（每行一个）", value=DEFAULT_CODES, height=160, key="signal_codes")
         if st.button("从默认股票池载入", key="signal_load_default_watchlist"):
             try:
                 watchlist = request_api(
@@ -612,6 +611,7 @@ def main() -> None:
                 for item in watchlist.get("items", [])
             )
             st.rerun()
+        codes_text = st.text_area("股票代码（每行一个）", value=DEFAULT_CODES, height=160, key="signal_codes")
         c1, c2, c3, c4 = st.columns(4)
         lookback_days = int(c1.number_input("回看天数", min_value=30, max_value=2000, value=180, step=10))
         adjust = c2.selectbox("复权方式", options=["qfq", "hfq", ""], format_func=lambda x: x or "不复权")
@@ -998,11 +998,13 @@ def main() -> None:
         review_trade_date = ""
         review_horizons = "1,3,5"
         review_summary_horizon = "T+3"
+        review_due_only = True
         if review_after_scan:
             r1, r2, r3 = st.columns(3)
             review_trade_date = r1.text_input("复盘交易日过滤（可选）", value="", key="job_review_trade_date")
             review_horizons = r2.text_input("复盘周期", value="1,3,5", key="job_review_horizons")
             review_summary_horizon = r3.selectbox("复盘统计周期", options=["T+1", "T+3", "T+5"], index=1, key="job_review_summary_horizon")
+            review_due_only = st.checkbox("只回填已到期样本", value=True, key="job_review_due_only")
         if notification_channel == "feishu_webhook":
             st.info("会向飞书机器人地址推送新事件。需要先在运行环境里配置 webhook。")
 
@@ -1015,6 +1017,7 @@ def main() -> None:
                 "review_trade_date": review_trade_date.strip(),
                 "review_horizons": [int(item.strip()) for item in review_horizons.split(",") if item.strip()],
                 "review_summary_horizon": review_summary_horizon,
+                "review_due_only": review_due_only,
             }
             try:
                 data = request_api(
@@ -1390,6 +1393,14 @@ def main() -> None:
 
         if "watchlist_codes_text" not in st.session_state:
             st.session_state["watchlist_codes_text"] = current_codes_text
+        if "watchlist_codes_text_pending" in st.session_state:
+            st.session_state["watchlist_codes_text"] = st.session_state.pop("watchlist_codes_text_pending")
+        if "watchlist_pending_message" in st.session_state:
+            pending_message = st.session_state.pop("watchlist_pending_message")
+            if pending_message.get("tone") == "warning":
+                st.warning(pending_message.get("text", ""))
+            else:
+                st.success(pending_message.get("text", ""))
 
         if watchlist is not None:
             st.caption(
@@ -1406,7 +1417,7 @@ def main() -> None:
 
         c1, c2, c3, c4 = st.columns(4)
         if c1.button("从服务端刷新股票池"):
-            st.session_state["watchlist_codes_text"] = current_codes_text
+            st.session_state["watchlist_codes_text_pending"] = current_codes_text
             st.rerun()
 
         if c2.button("保存默认股票池", type="primary"):
@@ -1430,8 +1441,12 @@ def main() -> None:
                 st.error(f"导入失败: {exc}")
                 st.stop()
 
-            st.session_state["watchlist_codes_text"] = "\n".join(str(item.get("code", "")) for item in data.get("items", []))
-            st.success(f"已导入沪深300成分股，共 {data.get('count', 0)} 只股票。")
+            st.session_state["watchlist_codes_text_pending"] = "\n".join(str(item.get("code", "")) for item in data.get("items", []))
+            st.session_state["watchlist_pending_message"] = {
+                "tone": "success",
+                "text": f"已导入沪深300成分股，共 {data.get('count', 0)} 只股票。",
+            }
+            st.rerun()
 
         if c4.button("初始化股票池"):
             try:
@@ -1444,11 +1459,18 @@ def main() -> None:
                 st.error(f"初始化失败: {exc}")
                 st.stop()
 
-            st.session_state["watchlist_codes_text"] = "\n".join(str(item.get("code", "")) for item in data.get("items", []))
+            st.session_state["watchlist_codes_text_pending"] = "\n".join(str(item.get("code", "")) for item in data.get("items", []))
             if data.get("warning"):
-                st.warning(f"{data.get('message', '已初始化默认股票池')}：{data.get('warning')}")
+                st.session_state["watchlist_pending_message"] = {
+                    "tone": "warning",
+                    "text": f"{data.get('message', '已初始化默认股票池')}：{data.get('warning')}",
+                }
             else:
-                st.success(f"已初始化默认股票池，共 {data.get('count', 0)} 只股票。")
+                st.session_state["watchlist_pending_message"] = {
+                    "tone": "success",
+                    "text": f"已初始化默认股票池，共 {data.get('count', 0)} 只股票。",
+                }
+            st.rerun()
 
     with kline_tab:
         render_section_header("K线工具", "直接查询 THSDK K 线，用于核对底层行情连接和单只股票历史数据。")

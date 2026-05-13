@@ -9,3 +9,4 @@ def test_api_healthcheck_covers_strategy_summary() -> None:
     assert "http://127.0.0.1:8000/health" in compose
     assert "http://127.0.0.1:8000/api/strategy/summary?horizon=T%2B3&limit=1" in compose
     assert "'total_count' in strategy" in compose
+    assert "AI_FINANCE_REVIEW_DUE_ONLY" in compose

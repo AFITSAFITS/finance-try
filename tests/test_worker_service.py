@@ -85,6 +85,7 @@ def test_run_single_scan_job_can_review_after_scan(monkeypatch) -> None:
     assert scan_called["min_score"] == 60.0
     assert review_called["backfill"]["trade_date"] == "2026-05-01"
     assert review_called["backfill"]["horizons"] == [1, 3]
+    assert review_called["backfill"]["due_only"] is True
     assert review_called["stats"]["horizon"] == "T+3"
     assert result["review_result"]["count"] == 3
     assert len(result["review_stats"]) == 1

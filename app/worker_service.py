@@ -49,6 +49,7 @@ def run_single_scan_job(
     review_trade_date: str = "",
     review_horizons: list[int] | tuple[int, ...] | None = None,
     review_summary_horizon: str = "T+3",
+    review_due_only: bool = True,
 ) -> dict[str, Any]:
     result = scan_workflow.run_default_watchlist_scan(
         lookback_days=int(lookback_days),
@@ -66,6 +67,7 @@ def run_single_scan_job(
             trade_date=review_trade_date.strip() or None,
             horizons=selected_horizons,
             adjust=adjust,
+            due_only=bool(review_due_only),
         )
         review_stats = review_service.summarize_review_stats(
             horizon=review_summary_horizon.strip() or "T+3",
@@ -111,6 +113,7 @@ def run_worker_loop(
     review_trade_date: str = "",
     review_horizons: list[int] | tuple[int, ...] | None = None,
     review_summary_horizon: str = "T+3",
+    review_due_only: bool = True,
     schedule_time: str = "15:05",
     timezone_name: str = "Asia/Shanghai",
     poll_seconds: int = 30,
@@ -131,6 +134,7 @@ def run_worker_loop(
                 review_trade_date=review_trade_date,
                 review_horizons=review_horizons,
                 review_summary_horizon=review_summary_horizon,
+                review_due_only=review_due_only,
             )
             last_run_date = now.strftime("%Y-%m-%d")
             summary = result.get("signal_summary", {})

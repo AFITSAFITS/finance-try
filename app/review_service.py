@@ -271,49 +271,49 @@ def backfill_review_snapshots(
     errors: list[dict[str, str]] = []
     end_date = datetime.now().strftime("%Y-%m-%d")
 
-    with db.get_connection() as conn:
-        for stock_code, code_events in grouped.items():
-            start_date = min(str(event["trade_date"]) for event in code_events)
-            try:
-                history_df = fetcher(stock_code, start_date, end_date, adjust)
-                normalized = signal_service.normalize_history_df(history_df, stock_code)
-                if normalized.empty:
+    for stock_code, code_events in grouped.items():
+        start_date = min(str(event["trade_date"]) for event in code_events)
+        try:
+            history_df = fetcher(stock_code, start_date, end_date, adjust)
+            normalized = signal_service.normalize_history_df(history_df, stock_code)
+            if normalized.empty:
+                continue
+
+            bar_service.upsert_daily_bars(stock_code, normalized, adjust=adjust)
+            indexed = normalized.copy()
+            indexed["日期字符串"] = indexed["日期"].map(signal_service.format_trade_date)
+            date_to_index = {
+                str(row["日期字符串"]): idx
+                for idx, row in indexed.iterrows()
+            }
+
+            for event in code_events:
+                event_date = str(event["trade_date"])
+                base_index = date_to_index.get(event_date)
+                if base_index is None:
                     continue
 
-                bar_service.upsert_daily_bars(stock_code, normalized, adjust=adjust)
-                indexed = normalized.copy()
-                indexed["日期字符串"] = indexed["日期"].map(signal_service.format_trade_date)
-                date_to_index = {
-                    str(row["日期字符串"]): idx
-                    for idx, row in indexed.iterrows()
-                }
-
-                for event in code_events:
-                    event_date = str(event["trade_date"])
-                    base_index = date_to_index.get(event_date)
-                    if base_index is None:
+                base_close = float(event["close_price"]) if event.get("close_price") is not None else float(indexed.iloc[base_index]["收盘"])
+                for horizon_days in selected_horizons:
+                    if due_only and not _is_horizon_due(event_date, horizon_days):
+                        continue
+                    future_index = base_index + int(horizon_days)
+                    if future_index >= len(indexed.index):
                         continue
 
-                    base_close = float(event["close_price"]) if event.get("close_price") is not None else float(indexed.iloc[base_index]["收盘"])
-                    for horizon_days in selected_horizons:
-                        if due_only and not _is_horizon_due(event_date, horizon_days):
-                            continue
-                        future_index = base_index + int(horizon_days)
-                        if future_index >= len(indexed.index):
-                            continue
+                    future_row = indexed.iloc[future_index]
+                    window = indexed.iloc[base_index + 1 : future_index + 1]
+                    if window.empty:
+                        continue
 
-                        future_row = indexed.iloc[future_index]
-                        window = indexed.iloc[base_index + 1 : future_index + 1]
-                        if window.empty:
-                            continue
-
-                        future_close = float(future_row["收盘"])
-                        pct_return = round(((future_close / base_close) - 1.0) * 100.0, 4)
-                        max_drawdown = round((((window["收盘"] / base_close) - 1.0).min()) * 100.0, 4)
-                        payload = _parse_payload(event)
-                        stop_hit, target_hit, risk_plan_outcome, risk_plan_hit_date = _risk_plan_hits(window, payload)
-                        label = horizon_label(horizon_days)
-                        now = tdx_service.now_ts()
+                    future_close = float(future_row["收盘"])
+                    pct_return = round(((future_close / base_close) - 1.0) * 100.0, 4)
+                    max_drawdown = round((((window["收盘"] / base_close) - 1.0).min()) * 100.0, 4)
+                    payload = _parse_payload(event)
+                    stop_hit, target_hit, risk_plan_outcome, risk_plan_hit_date = _risk_plan_hits(window, payload)
+                    label = horizon_label(horizon_days)
+                    now = tdx_service.now_ts()
+                    with db.get_connection() as conn:
                         conn.execute(
                             """
                             INSERT INTO review_snapshots (
@@ -361,10 +361,10 @@ def backfill_review_snapshots(
                             """,
                             (int(event["id"]), label),
                         ).fetchone()
-                        assert saved is not None
-                        snapshots.append(_row_to_snapshot(dict(saved)))
-            except Exception as exc:  # noqa: BLE001
-                errors.append({"股票代码": stock_code, "error": str(exc)})
+                    assert saved is not None
+                    snapshots.append(_row_to_snapshot(dict(saved)))
+        except Exception as exc:  # noqa: BLE001
+            errors.append({"股票代码": stock_code, "error": str(exc)})
 
     snapshots.sort(key=lambda item: (item["trade_date"], item["code"], item["summary"], item["horizon"]))
     return {

@@ -62,6 +62,12 @@ def parse_args() -> argparse.Namespace:
         default="T+3",
         help="Summary horizon label after review backfill, e.g. T+3",
     )
+    parser.add_argument(
+        "--review-due-only",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Only backfill matured review snapshots after the daily scan",
+    )
     return parser.parse_args()
 
 
@@ -133,6 +139,7 @@ def main() -> int:
                 trade_date=args.review_trade_date.strip() or None,
                 horizons=parse_horizon_args(args.review_horizons),
                 adjust=args.adjust,
+                due_only=bool(args.review_due_only),
             )
             review_stats = review_service.summarize_review_stats(
                 horizon=args.review_summary_horizon.strip() or "T+3",
@@ -164,6 +171,7 @@ def main() -> int:
         print(
             "scan_run_review "
             f"enabled={result['scan_run'].get('review_after_scan', True)} "
+            f"due_only={bool(args.review_due_only)} "
             f"snapshots={result['scan_run'].get('review_snapshot_count', review_result['count'])} "
             f"stats={result['scan_run'].get('review_stats_count', len(review_stats))} "
             f"error={result['scan_run'].get('review_error', '')}"

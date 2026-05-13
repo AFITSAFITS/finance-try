@@ -199,6 +199,7 @@ python scripts/run_daily_scan.py --review-after-scan --review-summary-horizon T+
 每日任务默认只保存和通知评分 60 以上的信号；如果想保留全部信号，可以设置 `--min-score 0`。
 同一只股票同一天如果触发多个信号，系统会保存全部事件用于复盘，但通知只发送一条代表信号，避免重复刷屏。
 如果希望日常扫描后顺手积累复盘结果，可以加 `--review-after-scan`；需要限制复盘范围时，可以配合 `--review-trade-date`。网页里的 `今日提醒` 也支持勾选“扫描后复盘已到期信号”。
+扫描后复盘默认只处理已经到期的样本；如果确实要尝试全部周期，可以加 `--no-review-due-only`。
 
 ### 常驻任务进程
 
@@ -209,7 +210,7 @@ python scripts/run_scan_worker.py --run-once --min-score 60
 python scripts/run_scan_worker.py --run-once --review-after-scan
 ```
 
-常驻任务也支持扫描后复盘；部署时可以设置 `AI_FINANCE_REVIEW_AFTER_SCAN=true`，并用 `AI_FINANCE_REVIEW_HORIZONS` 和 `AI_FINANCE_REVIEW_SUMMARY_HORIZON` 控制复盘周期。
+常驻任务也支持扫描后复盘；部署时可以设置 `AI_FINANCE_REVIEW_AFTER_SCAN=true`，并用 `AI_FINANCE_REVIEW_HORIZONS`、`AI_FINANCE_REVIEW_SUMMARY_HORIZON` 和 `AI_FINANCE_REVIEW_DUE_ONLY` 控制复盘范围。默认只处理已经到期的样本。
 
 ### 实时行情快照
 
@@ -508,6 +509,7 @@ AI_FINANCE_TIMEZONE=Asia/Shanghai
 AI_FINANCE_WORKER_POLL_SECONDS=30
 AI_FINANCE_PROVIDER_TIMEOUT_SECONDS=12
 AI_FINANCE_DAILY_MIN_SCORE=60
+AI_FINANCE_REVIEW_DUE_ONLY=true
 ```
 
 如果你更想用宿主机调度器，也可以关掉 `worker`，自己定时执行：
