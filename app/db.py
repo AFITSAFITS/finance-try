@@ -171,6 +171,8 @@ CREATE TABLE IF NOT EXISTS scan_runs (
     error_count INTEGER NOT NULL DEFAULT 0,
     elapsed_seconds REAL,
     min_score REAL,
+    status TEXT NOT NULL DEFAULT '',
+    note TEXT NOT NULL DEFAULT '',
     summary_json TEXT NOT NULL
 );
 
@@ -180,6 +182,8 @@ CREATE INDEX IF NOT EXISTS idx_scan_runs_run_at ON scan_runs(run_at);
 MIGRATIONS_SQL = [
     "ALTER TABLE limit_up_candidates ADD COLUMN sector_limit_up_count INTEGER",
     "ALTER TABLE limit_up_candidates ADD COLUMN sector_heat_rank INTEGER",
+    "ALTER TABLE scan_runs ADD COLUMN status TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE scan_runs ADD COLUMN note TEXT NOT NULL DEFAULT ''",
 ]
 
 

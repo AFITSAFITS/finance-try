@@ -63,7 +63,12 @@ def main() -> int:
         f"deliveries={len(result['delivery_results'])}"
     )
     if result.get("scan_run"):
-        print(f"scan_run_id={result['scan_run'].get('id')} run_at={result['scan_run'].get('run_at')}")
+        print(
+            f"scan_run_id={result['scan_run'].get('id')} "
+            f"run_at={result['scan_run'].get('run_at')} "
+            f"status={result['scan_run'].get('status', '')} "
+            f"note={result['scan_run'].get('note', '')}"
+        )
     if result.get("watchlist_message"):
         print(result["watchlist_message"])
     if result.get("watchlist_warning"):

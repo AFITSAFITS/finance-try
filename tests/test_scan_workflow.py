@@ -101,6 +101,7 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch, tmp_
     assert result["signal_summary"]["observation_counts"] == {"重点观察": 1}
     assert result["signal_summary"]["freshness_counts"] == {"最近交易日": 1}
     assert result["scan_run"]["event_count"] == 2
+    assert result["scan_run"]["status"] == "正常"
     assert result["scan_run"]["summary"]["signals"] == 1
     assert [item["id"] for item in result["notification_events"]] == [2]
     assert delivered["ids"] == [2]

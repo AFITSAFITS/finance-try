@@ -424,7 +424,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
             "elapsed_seconds": 12.5,
             "min_score": kwargs["min_score"],
             "signal_summary": {"signals": 1, "observation_counts": {"重点观察": 1}},
-            "scan_run": {"id": 7, "run_at": "2026-05-13 11:35:00"},
+            "scan_run": {"id": 7, "run_at": "2026-05-13 11:35:00", "status": "正常", "note": "扫描完成并生成信号"},
         }
 
     monkeypatch.setattr(api_module.scan_workflow, "run_default_watchlist_scan", fake_run_default_watchlist_scan)
@@ -442,6 +442,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
     assert body["min_score"] == 70.0
     assert body["signal_summary"]["signals"] == 1
     assert body["scan_run"]["id"] == 7
+    assert body["scan_run"]["status"] == "正常"
     assert body["deliveries"][0]["channel"] == "stdout"
     assert body["errors"][0]["股票代码"] == "000001"
 

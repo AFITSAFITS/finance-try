@@ -8,6 +8,18 @@ from app import tdx_service
 
 
 def _row_to_scan_run(row: Any) -> dict[str, Any]:
+    summary = json.loads(row["summary_json"])
+    status = str(row["status"] or "")
+    note = str(row["note"] or "")
+    if not status:
+        health = build_scan_run_health(
+            requested_count=int(row["requested_count"]),
+            event_count=int(row["event_count"]),
+            error_count=int(row["error_count"]),
+            signal_summary=summary,
+        )
+        status = health["status"]
+        note = health["note"]
     return {
         "id": row["id"],
         "run_at": row["run_at"],
@@ -20,8 +32,30 @@ def _row_to_scan_run(row: Any) -> dict[str, Any]:
         "error_count": row["error_count"],
         "elapsed_seconds": row["elapsed_seconds"],
         "min_score": row["min_score"],
-        "summary": json.loads(row["summary_json"]),
+        "status": status,
+        "note": note,
+        "summary": summary,
     }
+
+
+def build_scan_run_health(
+    *,
+    requested_count: int,
+    event_count: int,
+    error_count: int,
+    signal_summary: dict[str, Any],
+) -> dict[str, str]:
+    signals = int(signal_summary.get("signals") or 0)
+    stale_signals = int(signal_summary.get("stale_signals") or 0)
+    if requested_count > 0 and error_count >= requested_count:
+        return {"status": "失败", "note": "全部股票扫描失败"}
+    if error_count > 0:
+        return {"status": "部分失败", "note": f"{error_count} 只股票扫描失败"}
+    if stale_signals > 0:
+        return {"status": "数据滞后", "note": f"{stale_signals} 条信号数据可能滞后"}
+    if signals == 0 or event_count == 0:
+        return {"status": "无信号", "note": "本次没有命中可保存信号"}
+    return {"status": "正常", "note": "扫描完成并生成信号"}
 
 
 def persist_scan_run(
@@ -38,6 +72,12 @@ def persist_scan_run(
     signal_summary: dict[str, Any],
 ) -> dict[str, Any]:
     run_at = tdx_service.now_ts()
+    health = build_scan_run_health(
+        requested_count=requested_count,
+        event_count=event_count,
+        error_count=error_count,
+        signal_summary=signal_summary,
+    )
     summary_json = json.dumps(signal_summary, ensure_ascii=False, sort_keys=True)
     with db.get_connection() as conn:
         cursor = conn.execute(
@@ -45,9 +85,9 @@ def persist_scan_run(
             INSERT INTO scan_runs (
                 run_at, channel, watchlist_name, watchlist_source, requested_count,
                 event_count, notification_count, error_count, elapsed_seconds,
-                min_score, summary_json
+                min_score, status, note, summary_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 run_at,
@@ -60,6 +100,8 @@ def persist_scan_run(
                 int(error_count),
                 elapsed_seconds,
                 min_score,
+                health["status"],
+                health["note"],
                 summary_json,
             ),
         )
@@ -67,7 +109,7 @@ def persist_scan_run(
             """
             SELECT id, run_at, channel, watchlist_name, watchlist_source,
                    requested_count, event_count, notification_count, error_count,
-                   elapsed_seconds, min_score, summary_json
+                   elapsed_seconds, min_score, status, note, summary_json
             FROM scan_runs
             WHERE id = ?
             """,
@@ -83,7 +125,7 @@ def list_scan_runs(limit: int = 50) -> list[dict[str, Any]]:
             """
             SELECT id, run_at, channel, watchlist_name, watchlist_source,
                    requested_count, event_count, notification_count, error_count,
-                   elapsed_seconds, min_score, summary_json
+                   elapsed_seconds, min_score, status, note, summary_json
             FROM scan_runs
             ORDER BY id DESC
             LIMIT ?

@@ -660,7 +660,9 @@ def main() -> None:
             if data.get("scan_run"):
                 st.caption(
                     f"运行记录 ID={data['scan_run'].get('id', '')} | "
-                    f"记录时间={data['scan_run'].get('run_at', '')}"
+                    f"记录时间={data['scan_run'].get('run_at', '')} | "
+                    f"状态={data['scan_run'].get('status', '')} | "
+                    f"{data['scan_run'].get('note', '')}"
                 )
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("扫描股票数", data.get("requested_count", 0))
