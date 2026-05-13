@@ -134,7 +134,8 @@ def main() -> int:
             f"cache_fallback_signals={summary.get('cache_fallback_signals', 0)} "
             f"observations={summary.get('observation_counts', {})} "
             f"freshness={summary.get('freshness_counts', {})} "
-            f"data_sources={summary.get('data_source_counts', {})}"
+            f"data_sources={summary.get('data_source_counts', {})} "
+            f"strength={summary.get('relative_strength_bucket_counts', {})}"
         )
     strategy_guard = result.get("strategy_guard") if isinstance(result.get("strategy_guard"), dict) else {}
     if strategy_guard:

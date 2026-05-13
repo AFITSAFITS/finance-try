@@ -30,6 +30,8 @@ def test_persist_signal_rows_dedupes_events(monkeypatch, tmp_path) -> None:
                 "信号方向": "偏多",
                 "信号级别": "重点",
                 "评分原因": "多指标共振",
+                "相对强度": 92.0,
+                "相对强度分层": "强势",
             }
         ]
     )
@@ -54,6 +56,8 @@ def test_persist_signal_rows_dedupes_events(monkeypatch, tmp_path) -> None:
     assert history[0]["payload"]["cache_fetched_at"] == "2026-01-01 00:00:00"
     assert history[0]["payload"]["signal_score"] == 88.0
     assert history[0]["payload"]["signal_direction"] == "偏多"
+    assert history[0]["payload"]["relative_strength"] == 92.0
+    assert history[0]["payload"]["relative_strength_bucket"] == "强势"
 
     updated_df = df.copy()
     updated_df.loc[0, "信号评分"] = 72

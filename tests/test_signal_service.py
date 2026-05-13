@@ -125,7 +125,7 @@ def test_summarize_signal_rows_counts_quality_buckets() -> None:
         pd.DataFrame(
             [
                 {"观察结论": "谨慎观察", "数据时效": "最近交易日", "数据来源": "旧缓存兜底", "信号方向": "偏多", "信号评分": 78},
-                {"观察结论": "重点观察", "数据时效": "数据可能滞后", "数据来源": "外部行情源", "信号方向": "偏多", "信号评分": 86},
+                {"观察结论": "重点观察", "数据时效": "数据可能滞后", "数据来源": "外部行情源", "信号方向": "偏多", "信号评分": 86, "相对强度分层": "强势"},
             ]
         ),
         errors=[{"股票代码": "600000", "error": "timeout"}],
@@ -139,6 +139,7 @@ def test_summarize_signal_rows_counts_quality_buckets() -> None:
     assert summary["observation_counts"] == {"谨慎观察": 1, "重点观察": 1}
     assert summary["freshness_counts"] == {"最近交易日": 1, "数据可能滞后": 1}
     assert summary["data_source_counts"] == {"旧缓存兜底": 1, "外部行情源": 1}
+    assert summary["relative_strength_bucket_counts"] == {"未标记": 1, "强势": 1}
 
 
 def test_extract_candlestick_profile_detects_strong_and_upper_shadow() -> None:
@@ -360,9 +361,11 @@ def test_scan_stock_signal_events_adds_relative_strength() -> None:
     normal_row = df[df["股票代码"] == "600002"].iloc[0]
     assert strong_row["60日涨幅"] == 100.0
     assert strong_row["相对强度"] == 100.0
+    assert strong_row["相对强度分层"] == "强势"
     assert "股票池内强势" in strong_row["评分原因"]
     assert normal_row["20日涨幅"] == 10.0
     assert normal_row["相对强度"] > 50.0
+    assert normal_row["相对强度分层"] in {"偏强", "中性"}
 
 
 def test_relative_strength_can_filter_weak_pool_signal() -> None:

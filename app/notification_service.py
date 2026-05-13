@@ -30,6 +30,7 @@ def format_event_message(event: dict[str, Any]) -> str:
     position_60d = _format_number(payload.get("position_60d"))
     volume_ratio = _format_number(payload.get("volume_ratio"))
     relative_strength = _format_number(payload.get("relative_strength"))
+    relative_strength_bucket = _clean_display(payload.get("relative_strength_bucket"))
     candlestick_pattern = _clean_display(payload.get("candlestick_pattern"))
     stop_loss_price = _format_number(payload.get("stop_loss_price"))
     target_price = _format_number(payload.get("target_price"))
@@ -42,7 +43,8 @@ def format_event_message(event: dict[str, Any]) -> str:
         f"close={close_price} | pct_change={pct_change} | score={signal_score} | conclusion={observation_conclusion} | "
         f"data_freshness={data_freshness} | data_source={data_source} | "
         f"position_60d={position_60d} | volume_ratio={volume_ratio} | "
-        f"relative_strength={relative_strength} | candlestick={candlestick_pattern} | "
+        f"relative_strength={relative_strength} | strength_bucket={relative_strength_bucket} | "
+        f"candlestick={candlestick_pattern} | "
         f"stop_loss={stop_loss_price} | target={target_price} | risk={risk_note} | "
         f"strategy={strategy_verdict} | strategy_confidence={strategy_confidence} | "
         f"strategy_samples={strategy_sample_count} | next_action={strategy_next_action}"
@@ -103,6 +105,7 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
     position_60d = _format_number(payload.get("position_60d"))
     volume_ratio = _format_number(payload.get("volume_ratio"))
     relative_strength = _format_number(payload.get("relative_strength"))
+    relative_strength_bucket = _clean_display(payload.get("relative_strength_bucket"))
     candlestick_pattern = _clean_display(payload.get("candlestick_pattern"))
     stop_loss_price = _format_number(payload.get("stop_loss_price"))
     target_price = _format_number(payload.get("target_price"))
@@ -150,6 +153,7 @@ def build_feishu_event_card_payload(event: dict[str, Any], secret: str = "") -> 
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**60日位置**\n{position_60d}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**量能比**\n{volume_ratio}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**相对强度**\n{relative_strength}"}},
+                        {"is_short": True, "text": {"tag": "lark_md", "content": f"**强弱分层**\n{relative_strength_bucket}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**K线形态**\n{candlestick_pattern}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**参考止损**\n{stop_loss_price}"}},
                         {"is_short": True, "text": {"tag": "lark_md", "content": f"**参考目标**\n{target_price}"}},

@@ -47,6 +47,7 @@ SIGNAL_OUTPUT_COLUMNS = [
     "20日涨幅",
     "60日涨幅",
     "相对强度",
+    "相对强度分层",
     "K线形态",
     "K线提示",
     "参考止损",
@@ -502,10 +503,19 @@ def apply_relative_strength(
         row["60日涨幅"] = metrics.get("60日涨幅")
         if code not in rank_series:
             row["相对强度"] = None
+            row["相对强度分层"] = "未知"
             continue
 
         relative_strength = round(float(rank_series[code]), 2)
         row["相对强度"] = relative_strength
+        if relative_strength >= 80:
+            row["相对强度分层"] = "强势"
+        elif relative_strength >= 60:
+            row["相对强度分层"] = "偏强"
+        elif relative_strength >= 30:
+            row["相对强度分层"] = "中性"
+        else:
+            row["相对强度分层"] = "偏弱"
         if row.get("信号方向") != "偏多":
             continue
 
@@ -539,6 +549,7 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
             "freshness_counts": {},
             "direction_counts": {},
             "data_source_counts": {},
+            "relative_strength_bucket_counts": {},
             "stale_signals": 0,
             "cache_fallback_signals": 0,
         }
@@ -567,6 +578,7 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
         "freshness_counts": freshness_counts,
         "direction_counts": value_counts("信号方向"),
         "data_source_counts": value_counts("数据来源"),
+        "relative_strength_bucket_counts": value_counts("相对强度分层"),
         "stale_signals": stale_signals,
         "cache_fallback_signals": int(value_counts("数据来源").get("旧缓存兜底", 0)),
     }

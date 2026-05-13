@@ -61,6 +61,8 @@ def test_build_stdout_messages_formats_events() -> None:
                     "data_source": "旧缓存兜底",
                     "position_60d": 0.42,
                     "volume_ratio": 1.6,
+                    "relative_strength": 92,
+                    "relative_strength_bucket": "强势",
                     "stop_loss_price": 1450.0,
                     "target_price": 1690.0,
                     "risk_note": "无明显风险",
@@ -81,6 +83,8 @@ def test_build_stdout_messages_formats_events() -> None:
     assert "data_freshness=最近交易日" in messages[0]
     assert "data_source=旧缓存兜底" in messages[0]
     assert "position_60d=0.42" in messages[0]
+    assert "relative_strength=92.00" in messages[0]
+    assert "strength_bucket=强势" in messages[0]
     assert "stop_loss=1450.00" in messages[0]
     assert "target=1690.00" in messages[0]
     assert "risk=无明显风险" in messages[0]
@@ -124,6 +128,8 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
                 "data_lag_days": 0,
                 "position_60d": 0.35,
                 "volume_ratio": 1.8,
+                "relative_strength": 92,
+                "relative_strength_bucket": "强势",
                 "stop_loss_price": 1450.0,
                 "target_price": 1690.0,
                 "risk_reward_ratio": 2.0,
@@ -151,6 +157,8 @@ def test_build_feishu_event_card_payload_formats_event(monkeypatch) -> None:
     assert "**滞后天数**\n0.00" in field_text
     assert "**60日位置**\n0.35" in field_text
     assert "**量能比**\n1.80" in field_text
+    assert "**相对强度**\n92.00" in field_text
+    assert "**强弱分层**\n强势" in field_text
     assert "**参考止损**\n1450.00" in field_text
     assert "**参考目标**\n1690.00" in field_text
     assert "**风险收益比**\n2.00" in field_text

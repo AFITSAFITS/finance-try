@@ -222,6 +222,7 @@ def print_signal_summary(summary: dict[str, object]) -> None:
         f"observations={format_counts(summary.get('observation_counts', {}))} "
         f"freshness={format_counts(summary.get('freshness_counts', {}))} "
         f"data_sources={format_counts(summary.get('data_source_counts', {}))} "
+        f"strength={format_counts(summary.get('relative_strength_bucket_counts', {}))} "
         f"directions={format_counts(summary.get('direction_counts', {}))}"
     )
 
@@ -431,6 +432,7 @@ def main() -> int:
                 "20日涨幅",
                 "60日涨幅",
                 "相对强度",
+                "相对强度分层",
                 "K线形态",
                 "K线提示",
                 "参考止损",
