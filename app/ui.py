@@ -734,6 +734,8 @@ def main() -> None:
                     "avg_max_drawdown",
                     "avg_sector_limit_up_count",
                     "strategy_verdict",
+                    "strategy_confidence",
+                    "strategy_actionable",
                     "strategy_note",
                     "horizon",
                 ]
@@ -1074,6 +1076,8 @@ def main() -> None:
                     "target_first_rate",
                     "same_day_hit_rate",
                     "strategy_verdict",
+                    "strategy_confidence",
+                    "strategy_actionable",
                     "strategy_note",
                     "horizon",
                 ]

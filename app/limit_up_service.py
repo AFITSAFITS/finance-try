@@ -670,6 +670,8 @@ def summarize_limit_up_review_stats(
                 else None,
                 "strategy_verdict": decision["strategy_verdict"],
                 "strategy_note": decision["strategy_note"],
+                "strategy_confidence": decision["strategy_confidence"],
+                "strategy_actionable": decision["strategy_actionable"],
                 "horizon": horizon,
             }
         )

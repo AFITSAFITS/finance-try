@@ -199,6 +199,8 @@ def test_backfill_limit_up_review_snapshots_and_stats(monkeypatch, tmp_path) -> 
             "avg_sector_limit_up_count": 4.0,
             "strategy_verdict": "样本不足",
             "strategy_note": "样本数少于5，先继续积累",
+            "strategy_confidence": "低",
+            "strategy_actionable": False,
             "horizon": "T+3",
         }
     ]

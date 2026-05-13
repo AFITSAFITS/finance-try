@@ -51,6 +51,8 @@ def test_review_cli_stats_only_skips_signal_backfill(monkeypatch, capsys) -> Non
                 "target_first_rate": 0.5,
                 "same_day_hit_rate": 0.0,
                 "strategy_verdict": "样本不足",
+                "strategy_confidence": "低",
+                "strategy_actionable": False,
                 "strategy_note": "继续积累样本",
             }
         ]
@@ -72,6 +74,8 @@ def test_review_cli_stats_only_skips_signal_backfill(monkeypatch, capsys) -> Non
     assert "stop_first_rate=0.25" in captured.out
     assert "target_first_rate=0.5" in captured.out
     assert "same_day_hit_rate=0.0" in captured.out
+    assert "confidence=低" in captured.out
+    assert "actionable=False" in captured.out
 
 
 def test_review_cli_stats_only_skips_limit_up_backfill(monkeypatch, capsys) -> None:

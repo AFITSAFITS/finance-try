@@ -100,6 +100,7 @@ def main() -> int:
                 f"stop_first_rate={item['stop_first_rate']} | target_first_rate={item['target_first_rate']} | "
                 f"same_day_hit_rate={item['same_day_hit_rate']} | "
                 f"verdict={item['strategy_verdict']} | "
+                f"confidence={item['strategy_confidence']} | actionable={item['strategy_actionable']} | "
                 f"note={item['strategy_note']}"
             )
     elif args.target in {"signals", "both"}:
@@ -117,7 +118,8 @@ def main() -> int:
                 f"samples={item['sample_count']} | avg_return={item['avg_return']} | "
                 f"win_rate={item['win_rate']} | avg_max_drawdown={item['avg_max_drawdown']} | "
                 f"avg_sector_limit_up_count={item['avg_sector_limit_up_count']} | "
-                f"verdict={item['strategy_verdict']} | note={item['strategy_note']}"
+                f"verdict={item['strategy_verdict']} | confidence={item['strategy_confidence']} | "
+                f"actionable={item['strategy_actionable']} | note={item['strategy_note']}"
             )
     elif args.target in {"limit-up", "both"}:
         print("没有可用的涨停候选复盘统计结果。")

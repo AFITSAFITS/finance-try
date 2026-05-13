@@ -121,4 +121,6 @@ def test_backfill_review_snapshots_and_stats(monkeypatch, tmp_path) -> None:
     assert macd_stats["target_first_rate"] == 0.0
     assert macd_stats["same_day_hit_rate"] == 0.0
     assert macd_stats["strategy_verdict"] == "样本不足"
+    assert macd_stats["strategy_confidence"] == "低"
+    assert macd_stats["strategy_actionable"] is False
     assert "继续积累" in macd_stats["strategy_note"]
