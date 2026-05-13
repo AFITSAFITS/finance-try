@@ -29,6 +29,8 @@ def _signal_payload(row: dict[str, object]) -> dict[str, object]:
         "pct_change": _clean_number(row.get("涨跌幅")),
         "data_freshness": row.get("数据时效"),
         "data_lag_days": _clean_number(row.get("数据滞后天数")),
+        "data_source": row.get("数据来源"),
+        "cache_fetched_at": row.get("缓存获取时间"),
         "dif": _clean_number(row.get("DIF")),
         "dea": _clean_number(row.get("DEA")),
         "macd_pattern": row.get("MACD形态"),

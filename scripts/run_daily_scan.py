@@ -110,8 +110,10 @@ def main() -> int:
             f"errors={summary.get('error_count', 0)} "
             f"max_score={summary.get('max_score', '-')} "
             f"stale_signals={summary.get('stale_signals', 0)} "
+            f"cache_fallback_signals={summary.get('cache_fallback_signals', 0)} "
             f"observations={summary.get('observation_counts', {})} "
-            f"freshness={summary.get('freshness_counts', {})}"
+            f"freshness={summary.get('freshness_counts', {})} "
+            f"data_sources={summary.get('data_source_counts', {})}"
         )
 
     new_events = select_newly_delivered_events(

@@ -43,6 +43,7 @@ def test_fetch_daily_history_cached_reuses_fresh_cache(monkeypatch, tmp_path) ->
     assert len(first) == 20
     assert len(second) == 20
     assert list(second["股票代码"].unique()) == ["600001"]
+    assert set(second["数据来源"]) == {"本地缓存"}
 
 
 def test_fetch_daily_history_cached_falls_back_to_stale_cache_when_provider_fails(monkeypatch, tmp_path) -> None:
@@ -60,6 +61,7 @@ def test_fetch_daily_history_cached_falls_back_to_stale_cache_when_provider_fail
 
     assert len(fallback) >= 15
     assert list(fallback["股票代码"].unique()) == ["600001"]
+    assert set(fallback["数据来源"]) == {"旧缓存兜底"}
 
 
 def test_fetch_daily_history_cached_raises_when_provider_fails_without_enough_cache(monkeypatch, tmp_path) -> None:

@@ -28,6 +28,8 @@ SIGNAL_OUTPUT_COLUMNS = [
     "日期",
     "数据时效",
     "数据滞后天数",
+    "数据来源",
+    "缓存获取时间",
     "收盘",
     "涨跌幅",
     "信号评分",
@@ -536,7 +538,9 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
             "observation_counts": {},
             "freshness_counts": {},
             "direction_counts": {},
+            "data_source_counts": {},
             "stale_signals": 0,
+            "cache_fallback_signals": 0,
         }
 
     def value_counts(column: str) -> dict[str, int]:
@@ -562,7 +566,9 @@ def summarize_signal_rows(signal_rows: pd.DataFrame, errors: list[dict[str, str]
         "observation_counts": value_counts("观察结论"),
         "freshness_counts": freshness_counts,
         "direction_counts": value_counts("信号方向"),
+        "data_source_counts": value_counts("数据来源"),
         "stale_signals": stale_signals,
+        "cache_fallback_signals": int(value_counts("数据来源").get("旧缓存兜底", 0)),
     }
 
 
@@ -599,6 +605,8 @@ def extract_latest_signal_row(code: str, history_df: pd.DataFrame) -> dict[str, 
         "股票代码": code,
         "日期": format_trade_date(curr_row["日期"]),
         **extract_data_freshness(curr_row["日期"]),
+        "数据来源": curr_row.get("数据来源"),
+        "缓存获取时间": curr_row.get("缓存获取时间"),
         "收盘": round(float(curr_row["收盘"]), 4),
         "涨跌幅": None if pd.isna(curr_row["涨跌幅"]) else round(float(curr_row["涨跌幅"]), 4),
         "DIF": round(float(curr_row["DIF"]), 6),

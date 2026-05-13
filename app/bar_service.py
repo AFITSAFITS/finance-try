@@ -40,10 +40,19 @@ def cached_daily_bars_to_history_df(rows: list[dict[str, Any]]) -> pd.DataFrame:
                 "成交额": row["amount"],
                 "涨跌幅": row["pct_change"],
                 "换手率": row["turnover_rate"],
+                "数据来源": "本地缓存",
+                "缓存获取时间": row.get("fetched_at", ""),
             }
             for row in rows
         ]
     )
+
+
+def _cached_history_df(rows: list[dict[str, Any]], source_label: str) -> pd.DataFrame:
+    history_df = cached_daily_bars_to_history_df(rows)
+    if not history_df.empty:
+        history_df["数据来源"] = source_label
+    return history_df
 
 
 def _cached_rows_are_usable(rows: list[dict[str, Any]], lookback_days: int) -> bool:
@@ -72,7 +81,7 @@ def fetch_daily_history_cached(
     cached_rows = list_daily_bars_range(code, start, end, adjust=adjust)
     if _cached_rows_are_usable(cached_rows, lookback_days):
         return signal_service.normalize_history_df(
-            cached_daily_bars_to_history_df(cached_rows),
+            _cached_history_df(cached_rows, "本地缓存"),
             code,
         )
 
@@ -81,11 +90,14 @@ def fetch_daily_history_cached(
     except Exception:
         if _cached_rows_have_enough_history(cached_rows, lookback_days):
             return signal_service.normalize_history_df(
-                cached_daily_bars_to_history_df(cached_rows),
+                _cached_history_df(cached_rows, "旧缓存兜底"),
                 code,
             )
         raise
     upsert_daily_bars(code, fetched, adjust=adjust)
+    fetched = fetched.copy()
+    fetched["数据来源"] = "外部行情源"
+    fetched["缓存获取时间"] = ""
     return fetched
 
 

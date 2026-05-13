@@ -39,8 +39,10 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
                 "error_count": 1,
                 "max_score": 85,
                 "stale_signals": 0,
+                "cache_fallback_signals": 1,
                 "observation_counts": {"重点观察": 1, "谨慎观察": 1},
                 "freshness_counts": {"最近交易日": 2},
+                "data_source_counts": {"旧缓存兜底": 1, "外部行情源": 1},
             },
             "scan_run": {"id": 3, "run_at": "2026-05-13 11:35:00", "status": "正常", "note": "扫描完成并生成信号"},
             "errors": [{"股票代码": "000001", "error": "network timeout"}],
@@ -66,6 +68,8 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
     assert "scan_run_id=3" in captured.out
     assert "status=正常" in captured.out
     assert "stale_signals=0" in captured.out
+    assert "cache_fallback_signals=1" in captured.out
+    assert "data_sources={'旧缓存兜底': 1, '外部行情源': 1}" in captured.out
     assert "默认股票池" in captured.out
     assert "MACD金叉" in captured.out
     assert "WARNING [000001]: network timeout" in captured.err

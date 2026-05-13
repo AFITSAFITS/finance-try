@@ -124,8 +124,8 @@ def test_summarize_signal_rows_counts_quality_buckets() -> None:
     summary = signal_service.summarize_signal_rows(
         pd.DataFrame(
             [
-                {"观察结论": "谨慎观察", "数据时效": "最近交易日", "信号方向": "偏多", "信号评分": 78},
-                {"观察结论": "重点观察", "数据时效": "数据可能滞后", "信号方向": "偏多", "信号评分": 86},
+                {"观察结论": "谨慎观察", "数据时效": "最近交易日", "数据来源": "旧缓存兜底", "信号方向": "偏多", "信号评分": 78},
+                {"观察结论": "重点观察", "数据时效": "数据可能滞后", "数据来源": "外部行情源", "信号方向": "偏多", "信号评分": 86},
             ]
         ),
         errors=[{"股票代码": "600000", "error": "timeout"}],
@@ -135,8 +135,10 @@ def test_summarize_signal_rows_counts_quality_buckets() -> None:
     assert summary["error_count"] == 1
     assert summary["max_score"] == 86.0
     assert summary["stale_signals"] == 1
+    assert summary["cache_fallback_signals"] == 1
     assert summary["observation_counts"] == {"谨慎观察": 1, "重点观察": 1}
     assert summary["freshness_counts"] == {"最近交易日": 1, "数据可能滞后": 1}
+    assert summary["data_source_counts"] == {"旧缓存兜底": 1, "外部行情源": 1}
 
 
 def test_extract_candlestick_profile_detects_strong_and_upper_shadow() -> None:

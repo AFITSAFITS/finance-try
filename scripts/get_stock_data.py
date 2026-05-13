@@ -218,8 +218,10 @@ def print_signal_summary(summary: dict[str, object]) -> None:
         f"errors={summary.get('error_count', 0)} "
         f"max_score={summary.get('max_score', '-')} "
         f"stale_signals={summary.get('stale_signals', 0)} "
+        f"cache_fallback_signals={summary.get('cache_fallback_signals', 0)} "
         f"observations={format_counts(summary.get('observation_counts', {}))} "
         f"freshness={format_counts(summary.get('freshness_counts', {}))} "
+        f"data_sources={format_counts(summary.get('data_source_counts', {}))} "
         f"directions={format_counts(summary.get('direction_counts', {}))}"
     )
 
