@@ -74,6 +74,12 @@ def parse_args() -> argparse.Namespace:
         default=os.getenv("AI_FINANCE_STRATEGY_GUARD_HORIZON", "T+1"),
         help="Review horizon used to attach strategy conclusions to daily notifications",
     )
+    parser.add_argument(
+        "--mute-downgraded-strategies",
+        action=argparse.BooleanOptionalAction,
+        default=os.getenv("AI_FINANCE_MUTE_DOWNGRADED_STRATEGIES", "").strip().lower() in {"1", "true", "yes", "on"},
+        help="Do not notify signals whose matched strategy verdict is downgraded",
+    )
     return parser.parse_args()
 
 
@@ -87,6 +93,7 @@ def main() -> int:
             max_workers=int(args.max_workers),
             min_score=float(args.min_score),
             strategy_guard_horizon=args.strategy_guard_horizon,
+            mute_downgraded_strategies=bool(args.mute_downgraded_strategies),
         )
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
@@ -135,7 +142,9 @@ def main() -> int:
             "strategy_guard "
             f"horizon={strategy_guard.get('horizon', '')} "
             f"matched={strategy_guard.get('matched_count', 0)} "
-            f"total={strategy_guard.get('total_count', 0)}"
+            f"total={strategy_guard.get('total_count', 0)} "
+            f"mute_downgraded={strategy_guard.get('mute_downgraded', False)} "
+            f"muted={strategy_guard.get('muted_count', 0)}"
         )
 
     new_events = select_newly_delivered_events(

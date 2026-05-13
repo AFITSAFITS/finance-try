@@ -11,3 +11,4 @@ def test_api_healthcheck_covers_strategy_summary() -> None:
     assert "'total_count' in strategy" in compose
     assert "AI_FINANCE_REVIEW_DUE_ONLY" in compose
     assert "AI_FINANCE_STRATEGY_GUARD_HORIZON" in compose
+    assert "AI_FINANCE_MUTE_DOWNGRADED_STRATEGIES" in compose

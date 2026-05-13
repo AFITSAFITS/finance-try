@@ -17,6 +17,25 @@ def default_strategy_guard_horizon() -> str:
     return os.getenv("AI_FINANCE_STRATEGY_GUARD_HORIZON", "T+1").strip() or "T+1"
 
 
+def default_mute_downgraded_strategies() -> bool:
+    return os.getenv("AI_FINANCE_MUTE_DOWNGRADED_STRATEGIES", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_downgraded_strategy_event(event: dict[str, Any]) -> bool:
+    payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
+    return str(payload.get("strategy_verdict", "")).strip() == "降权"
+
+
+def filter_notification_events_by_strategy(
+    events: list[dict[str, Any]],
+    mute_downgraded: bool = False,
+) -> tuple[list[dict[str, Any]], int]:
+    if not mute_downgraded:
+        return events, 0
+    filtered = [event for event in events if not _is_downgraded_strategy_event(event)]
+    return filtered, len(events) - len(filtered)
+
+
 def _event_priority(event: dict[str, Any]) -> tuple[float, float, int]:
     payload = event.get("payload") if isinstance(event.get("payload"), dict) else {}
     severity_score = 1.0 if str(event.get("severity", "")).lower() in {"high", "critical"} else 0.0
@@ -62,6 +81,7 @@ def run_default_watchlist_scan(
     bootstrap_if_empty: bool = True,
     min_score: float | None = 60.0,
     strategy_guard_horizon: str | None = None,
+    mute_downgraded_strategies: bool | None = None,
 ) -> dict[str, Any]:
     if bootstrap_if_empty:
         watchlist = watchlist_service.ensure_default_watchlist()
@@ -86,7 +106,22 @@ def run_default_watchlist_scan(
         persisted_events,
         horizon=guard_horizon or default_strategy_guard_horizon(),
     )
-    notification_events = select_representative_notification_events(annotated_events)
+    mute_downgraded = (
+        default_mute_downgraded_strategies()
+        if mute_downgraded_strategies is None
+        else bool(mute_downgraded_strategies)
+    )
+    notification_candidates, muted_count = filter_notification_events_by_strategy(
+        annotated_events,
+        mute_downgraded=mute_downgraded,
+    )
+    strategy_guard.update(
+        {
+            "mute_downgraded": mute_downgraded,
+            "muted_count": muted_count,
+        }
+    )
+    notification_events = select_representative_notification_events(notification_candidates)
     delivery_results = notification_service.deliver_signal_events(
         notification_events,
         channel=channel,

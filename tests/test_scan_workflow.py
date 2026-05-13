@@ -63,6 +63,22 @@ def test_select_representative_notification_events_prefers_better_strategy_when_
     assert [item["id"] for item in selected] == [2]
 
 
+def test_filter_notification_events_by_strategy_can_mute_downgraded() -> None:
+    events = [
+        {"id": 1, "payload": {"strategy_verdict": "降权"}},
+        {"id": 2, "payload": {"strategy_verdict": "保留"}},
+        {"id": 3, "payload": {}},
+    ]
+
+    filtered, muted_count = scan_workflow.filter_notification_events_by_strategy(
+        events,
+        mute_downgraded=True,
+    )
+
+    assert [item["id"] for item in filtered] == [2, 3]
+    assert muted_count == 1
+
+
 def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
     def fake_ensure_default_watchlist():
@@ -138,5 +154,47 @@ def test_run_default_watchlist_scan_bootstraps_empty_watchlist(monkeypatch, tmp_
     assert delivered["ids"] == [2]
     assert delivered["strategy_verdicts"] == ["保留"]
     assert result["strategy_guard"]["matched_count"] == 2
+    assert result["strategy_guard"]["muted_count"] == 0
     assert result["watchlist_source"] == "seed"
     assert result["watchlist_message"] == "已使用内置种子股票池"
+
+
+def test_run_default_watchlist_scan_can_mute_downgraded_notifications(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("AI_FINANCE_DB_PATH", str(tmp_path / "app.db"))
+    monkeypatch.setattr(
+        scan_workflow.watchlist_service,
+        "ensure_default_watchlist",
+        lambda: {"name": "默认股票池", "count": 1, "items": [{"code": "600519"}], "source": "seed"},
+    )
+    monkeypatch.setattr(scan_workflow.signal_service, "scan_stock_signal_events", lambda **kwargs: (pd.DataFrame([{"股票代码": "600519"}]), []))
+    saved_events = [
+        {"id": 1, "trade_date": "2026-05-12", "code": "600519", "severity": "normal", "event_type": "golden_cross", "payload": {"signal_score": 70}},
+        {"id": 2, "trade_date": "2026-05-12", "code": "600520", "severity": "normal", "event_type": "golden_cross", "payload": {"signal_score": 70}},
+    ]
+    monkeypatch.setattr(scan_workflow.event_service, "persist_signal_rows", lambda df: saved_events)
+    monkeypatch.setattr(
+        scan_workflow.strategy_guard_service,
+        "annotate_signal_events_with_strategy_decisions",
+        lambda events, horizon: (
+            [
+                {**events[0], "payload": {**events[0]["payload"], "strategy_verdict": "降权"}},
+                {**events[1], "payload": {**events[1]["payload"], "strategy_verdict": "保留"}},
+            ],
+            {"enabled": True, "horizon": horizon, "matched_count": 2, "total_count": 2},
+        ),
+    )
+    delivered: dict[str, object] = {}
+    monkeypatch.setattr(
+        scan_workflow.notification_service,
+        "deliver_signal_events",
+        lambda events, channel: delivered.setdefault("ids", [item["id"] for item in events]) and [{"signal_event_id": item["id"], "created": True} for item in events],
+    )
+
+    result = scan_workflow.run_default_watchlist_scan(mute_downgraded_strategies=True)
+
+    assert result["scan_run"]["event_count"] == 2
+    assert result["scan_run"]["notification_count"] == 1
+    assert result["strategy_guard"]["mute_downgraded"] is True
+    assert result["strategy_guard"]["muted_count"] == 1
+    assert [item["id"] for item in result["notification_events"]] == [2]
+    assert delivered["ids"] == [2]

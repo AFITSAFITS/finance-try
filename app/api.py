@@ -87,6 +87,7 @@ class RunDailyJobRequest(BaseModel):
     review_summary_horizon: str = "T+3"
     review_due_only: bool = True
     strategy_guard_horizon: str = "T+1"
+    mute_downgraded_strategies: bool = False
 
 
 class BackfillReviewsRequest(BaseModel):
@@ -441,6 +442,7 @@ def api_run_daily_job(req: RunDailyJobRequest) -> dict[str, Any]:
             max_workers=int(req.max_workers),
             min_score=float(req.min_score),
             strategy_guard_horizon=req.strategy_guard_horizon.strip() or "T+1",
+            mute_downgraded_strategies=bool(req.mute_downgraded_strategies),
         )
         review_result: dict[str, Any] | None = None
         review_stats: list[dict[str, Any]] = []

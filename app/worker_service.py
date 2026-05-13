@@ -51,6 +51,7 @@ def run_single_scan_job(
     review_summary_horizon: str = "T+3",
     review_due_only: bool = True,
     strategy_guard_horizon: str | None = None,
+    mute_downgraded_strategies: bool | None = None,
 ) -> dict[str, Any]:
     result = scan_workflow.run_default_watchlist_scan(
         lookback_days=int(lookback_days),
@@ -59,6 +60,7 @@ def run_single_scan_job(
         max_workers=int(max_workers),
         min_score=float(min_score),
         strategy_guard_horizon=strategy_guard_horizon,
+        mute_downgraded_strategies=mute_downgraded_strategies,
     )
     if not review_after_scan:
         return result
@@ -117,6 +119,7 @@ def run_worker_loop(
     review_summary_horizon: str = "T+3",
     review_due_only: bool = True,
     strategy_guard_horizon: str | None = None,
+    mute_downgraded_strategies: bool | None = None,
     schedule_time: str = "15:05",
     timezone_name: str = "Asia/Shanghai",
     poll_seconds: int = 30,
@@ -139,6 +142,7 @@ def run_worker_loop(
                 review_summary_horizon=review_summary_horizon,
                 review_due_only=review_due_only,
                 strategy_guard_horizon=strategy_guard_horizon,
+                mute_downgraded_strategies=mute_downgraded_strategies,
             )
             last_run_date = now.strftime("%Y-%m-%d")
             summary = result.get("signal_summary", {})

@@ -69,6 +69,12 @@ def parse_args() -> argparse.Namespace:
         help="Review horizon used to attach strategy conclusions to worker notifications",
     )
     parser.add_argument(
+        "--mute-downgraded-strategies",
+        action=argparse.BooleanOptionalAction,
+        default=env_flag("AI_FINANCE_MUTE_DOWNGRADED_STRATEGIES", False),
+        help="Do not notify signals whose matched strategy verdict is downgraded",
+    )
+    parser.add_argument(
         "--schedule-time",
         type=str,
         default=os.getenv("AI_FINANCE_WORKER_SCHEDULE_TIME", "15:05"),
@@ -105,6 +111,7 @@ def main() -> int:
                 review_summary_horizon=args.review_summary_horizon,
                 review_due_only=bool(args.review_due_only),
                 strategy_guard_horizon=args.strategy_guard_horizon,
+                mute_downgraded_strategies=bool(args.mute_downgraded_strategies),
             )
             print(
                 f"watchlist={result['watchlist'].get('name', '')} "
@@ -138,6 +145,7 @@ def main() -> int:
             review_summary_horizon=args.review_summary_horizon,
             review_due_only=bool(args.review_due_only),
             strategy_guard_horizon=args.strategy_guard_horizon,
+            mute_downgraded_strategies=bool(args.mute_downgraded_strategies),
             schedule_time=args.schedule_time,
             timezone_name=args.timezone,
             poll_seconds=int(args.poll_seconds),

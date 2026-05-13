@@ -44,6 +44,7 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
                 "freshness_counts": {"最近交易日": 2},
                 "data_source_counts": {"旧缓存兜底": 1, "外部行情源": 1},
             },
+            "strategy_guard": {"horizon": "T+1", "matched_count": 1, "total_count": 2, "mute_downgraded": True, "muted_count": 1},
             "scan_run": {"id": 3, "run_at": "2026-05-13 11:35:00", "status": "正常", "note": "扫描完成并生成信号"},
             "errors": [{"股票代码": "000001", "error": "network timeout"}],
         }
@@ -54,7 +55,7 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         sys,
         "argv",
-        [str(DAILY_SCAN_SCRIPT), "--channel", "stdout", "--min-score", "70"],
+        [str(DAILY_SCAN_SCRIPT), "--channel", "stdout", "--min-score", "70", "--mute-downgraded-strategies"],
     )
 
     result = module.main()
@@ -62,6 +63,7 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
 
     assert result == 0
     assert called["min_score"] == 70.0
+    assert called["mute_downgraded_strategies"] is True
     assert review_called == {"backfill": False, "stats": False}
     assert "min_score=70.0" in captured.out
     assert "signal_summary" in captured.out
@@ -70,6 +72,7 @@ def test_run_daily_scan_cli_success(monkeypatch, capsys) -> None:
     assert "stale_signals=0" in captured.out
     assert "cache_fallback_signals=1" in captured.out
     assert "data_sources={'旧缓存兜底': 1, '外部行情源': 1}" in captured.out
+    assert "strategy_guard horizon=T+1 matched=1 total=2 mute_downgraded=True muted=1" in captured.out
     assert "默认股票池" in captured.out
     assert "MACD金叉" in captured.out
     assert "WARNING [000001]: network timeout" in captured.err

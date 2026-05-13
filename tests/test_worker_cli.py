@@ -36,7 +36,7 @@ def test_run_scan_worker_cli_run_once(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         sys,
         "argv",
-        [str(WORKER_SCRIPT), "--run-once", "--channel", "feishu_webhook", "--min-score", "70"],
+        [str(WORKER_SCRIPT), "--run-once", "--channel", "feishu_webhook", "--min-score", "70", "--mute-downgraded-strategies"],
     )
 
     result = module.main()
@@ -45,6 +45,7 @@ def test_run_scan_worker_cli_run_once(monkeypatch, capsys) -> None:
     assert result == 0
     assert called["channel"] == "feishu_webhook"
     assert called["min_score"] == 70.0
+    assert called["mute_downgraded_strategies"] is True
     assert "min_score=70.0" in captured.out
     assert "默认股票池" in captured.out
 

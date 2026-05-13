@@ -41,10 +41,12 @@ def test_run_single_scan_job_invokes_scan_workflow(monkeypatch) -> None:
         adjust="qfq",
         max_workers=8,
         min_score=70,
+        mute_downgraded_strategies=True,
     )
 
     assert called["channel"] == "feishu_webhook"
     assert called["min_score"] == 70.0
+    assert called["mute_downgraded_strategies"] is True
     assert result["watchlist"]["name"] == "默认股票池"
 
 

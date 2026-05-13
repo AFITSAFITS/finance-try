@@ -415,6 +415,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
     def fake_run_default_watchlist_scan(**kwargs):
         assert kwargs["channel"] == "stdout"
         assert kwargs["min_score"] == 70.0
+        assert kwargs["mute_downgraded_strategies"] is True
         return {
             "watchlist": {"name": "默认股票池", "count": 2},
             "persisted_events": [{"summary": "MACD金叉", "code": "600519"}],
@@ -424,6 +425,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
             "elapsed_seconds": 12.5,
             "min_score": kwargs["min_score"],
             "signal_summary": {"signals": 1, "observation_counts": {"重点观察": 1}},
+            "strategy_guard": {"horizon": "T+1", "matched_count": 1, "total_count": 1, "mute_downgraded": True, "muted_count": 1},
             "scan_run": {"id": 7, "run_at": "2026-05-13 11:35:00", "status": "正常", "note": "扫描完成并生成信号"},
         }
 
@@ -431,7 +433,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
 
     resp = client.post(
         "/api/signals/run-daily-job",
-        json={"channel": "stdout", "min_score": 70},
+        json={"channel": "stdout", "min_score": 70, "mute_downgraded_strategies": True},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -441,6 +443,7 @@ def test_run_daily_job_returns_deliveries(monkeypatch, tmp_path) -> None:
     assert body["elapsed_seconds"] == 12.5
     assert body["min_score"] == 70.0
     assert body["signal_summary"]["signals"] == 1
+    assert body["strategy_guard"]["muted_count"] == 1
     assert body["scan_run"]["id"] == 7
     assert body["scan_run"]["status"] == "正常"
     assert body["deliveries"][0]["channel"] == "stdout"
