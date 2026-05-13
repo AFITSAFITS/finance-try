@@ -95,6 +95,8 @@ def test_backfill_review_snapshots_and_stats(monkeypatch, tmp_path) -> None:
     assert t3_rows[0]["target_price"] == 11.6
     assert t3_rows[0]["risk_reward_ratio"] == 2.0
     assert round(float(t3_rows[0]["stop_distance_pct"]), 4) == 8.0
+    assert t3_rows[0]["stop_hit"] is True
+    assert t3_rows[0]["target_hit"] is True
 
     assert len(stats) == 2
     macd_stats = next(item for item in stats if item["summary"] == "MACD金叉")
@@ -111,5 +113,7 @@ def test_backfill_review_snapshots_and_stats(monkeypatch, tmp_path) -> None:
     assert macd_stats["avg_volume_ratio"] == 1.35
     assert macd_stats["avg_stop_distance_pct"] == 8.0
     assert macd_stats["avg_risk_reward_ratio"] == 2.0
+    assert macd_stats["stop_hit_rate"] == 1.0
+    assert macd_stats["target_hit_rate"] == 1.0
     assert macd_stats["strategy_verdict"] == "样本不足"
     assert "继续积累" in macd_stats["strategy_note"]

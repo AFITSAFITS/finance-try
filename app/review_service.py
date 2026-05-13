@@ -135,8 +135,30 @@ def _row_to_snapshot(row: dict[str, Any]) -> dict[str, Any]:
         "target_price": payload.get("target_price"),
         "risk_reward_ratio": payload.get("risk_reward_ratio"),
         "stop_distance_pct": stop_distance_pct,
+        "stop_hit": None if row.get("stop_hit") is None else bool(row.get("stop_hit")),
+        "target_hit": None if row.get("target_hit") is None else bool(row.get("target_hit")),
         "updated_at": row["updated_at"],
     }
+
+
+def _risk_plan_hits(window: pd.DataFrame, payload: dict[str, Any]) -> tuple[int | None, int | None]:
+    stop_loss_price = payload.get("stop_loss_price")
+    target_price = payload.get("target_price")
+    stop_hit: int | None = None
+    target_hit: int | None = None
+    if stop_loss_price is not None and "最低" in window.columns:
+        try:
+            stop = float(stop_loss_price)
+            stop_hit = int(stop > 0 and float(window["最低"].min()) <= stop)
+        except (TypeError, ValueError):
+            stop_hit = None
+    if target_price is not None and "最高" in window.columns:
+        try:
+            target = float(target_price)
+            target_hit = int(target > 0 and float(window["最高"].max()) >= target)
+        except (TypeError, ValueError):
+            target_hit = None
+    return stop_hit, target_hit
 
 
 def list_review_snapshots(
@@ -165,7 +187,7 @@ def list_review_snapshots(
             SELECT r.id, r.signal_event_id, e.trade_date, e.code, e.indicator, e.event_type, e.summary,
                    e.close_price,
                    r.horizon, r.future_trade_date, r.future_close_price, r.pct_return,
-                   r.max_drawdown, r.updated_at, e.payload_json
+                   r.max_drawdown, r.stop_hit, r.target_hit, r.updated_at, e.payload_json
             FROM review_snapshots r
             JOIN signal_events e ON e.id = r.signal_event_id
             {where_sql}
@@ -234,21 +256,25 @@ def backfill_review_snapshots(
                         future_close = float(future_row["收盘"])
                         pct_return = round(((future_close / base_close) - 1.0) * 100.0, 4)
                         max_drawdown = round((((window["收盘"] / base_close) - 1.0).min()) * 100.0, 4)
+                        payload = _parse_payload(event)
+                        stop_hit, target_hit = _risk_plan_hits(window, payload)
                         label = horizon_label(horizon_days)
                         now = tdx_service.now_ts()
                         conn.execute(
                             """
                             INSERT INTO review_snapshots (
                                 signal_event_id, horizon, future_trade_date, future_close_price,
-                                pct_return, max_drawdown, updated_at
+                                pct_return, max_drawdown, stop_hit, target_hit, updated_at
                             )
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ON CONFLICT(signal_event_id, horizon)
                             DO UPDATE SET
                                 future_trade_date=excluded.future_trade_date,
                                 future_close_price=excluded.future_close_price,
                                 pct_return=excluded.pct_return,
                                 max_drawdown=excluded.max_drawdown,
+                                stop_hit=excluded.stop_hit,
+                                target_hit=excluded.target_hit,
                                 updated_at=excluded.updated_at
                             """,
                             (
@@ -258,6 +284,8 @@ def backfill_review_snapshots(
                                 future_close,
                                 pct_return,
                                 max_drawdown,
+                                stop_hit,
+                                target_hit,
                                 now,
                             ),
                         )
@@ -266,7 +294,7 @@ def backfill_review_snapshots(
                             SELECT r.id, r.signal_event_id, e.trade_date, e.code, e.indicator, e.event_type, e.summary,
                                    e.close_price,
                                    r.horizon, r.future_trade_date, r.future_close_price, r.pct_return,
-                                   r.max_drawdown, r.updated_at, e.payload_json
+                                   r.max_drawdown, r.stop_hit, r.target_hit, r.updated_at, e.payload_json
                             FROM review_snapshots r
                             JOIN signal_events e ON e.id = r.signal_event_id
                             WHERE r.signal_event_id = ? AND r.horizon = ?
@@ -331,6 +359,8 @@ def summarize_review_stats(
             avg_volume_ratio=("volume_ratio", "mean"),
             avg_stop_distance_pct=("stop_distance_pct", "mean"),
             avg_risk_reward_ratio=("risk_reward_ratio", "mean"),
+            stop_hit_rate=("stop_hit", "mean"),
+            target_hit_rate=("target_hit", "mean"),
         )
         .reset_index()
     )
@@ -372,6 +402,12 @@ def summarize_review_stats(
                 else None,
                 "avg_risk_reward_ratio": round(float(row["avg_risk_reward_ratio"]), 4)
                 if not pd.isna(row["avg_risk_reward_ratio"])
+                else None,
+                "stop_hit_rate": round(float(row["stop_hit_rate"]), 4)
+                if not pd.isna(row["stop_hit_rate"])
+                else None,
+                "target_hit_rate": round(float(row["target_hit_rate"]), 4)
+                if not pd.isna(row["target_hit_rate"])
                 else None,
                 "strategy_verdict": decision["strategy_verdict"],
                 "strategy_note": decision["strategy_note"],

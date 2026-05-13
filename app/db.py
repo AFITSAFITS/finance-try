@@ -91,6 +91,8 @@ CREATE TABLE IF NOT EXISTS review_snapshots (
     future_close_price REAL,
     pct_return REAL,
     max_drawdown REAL,
+    stop_hit INTEGER,
+    target_hit INTEGER,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (signal_event_id) REFERENCES signal_events(id) ON DELETE CASCADE,
     UNIQUE (signal_event_id, horizon)
@@ -184,6 +186,8 @@ MIGRATIONS_SQL = [
     "ALTER TABLE limit_up_candidates ADD COLUMN sector_heat_rank INTEGER",
     "ALTER TABLE scan_runs ADD COLUMN status TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE scan_runs ADD COLUMN note TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE review_snapshots ADD COLUMN stop_hit INTEGER",
+    "ALTER TABLE review_snapshots ADD COLUMN target_hit INTEGER",
 ]
 
 
